@@ -19,13 +19,24 @@
           "cameraPermission": "Permitir que $(PRODUCT_NAME) acesse sua câmera para verificação facial e leitura de tickets",
           "microphonePermission": false
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Este app precisa acessar a câmera para verificação facial e leitura de QR codes de tickets",
-        "NSFaceIDUsageDescription": "Este app usa reconhecimento facial para verificar sua identidade de forma segura"
+        "NSFaceIDUsageDescription": "Este app usa reconhecimento facial para verificar sua identidade de forma segura",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
@@ -33,13 +44,25 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["android.permission.CAMERA"],
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.caio12323.eticketrestauranteapp",
+      "usesCleartextTraffic": true
     },
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1ff9ff6d-ca7d-46f9-b842-a6079304a191"
+      }
     }
   }
 }

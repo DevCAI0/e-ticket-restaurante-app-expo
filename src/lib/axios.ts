@@ -6,13 +6,15 @@ import { User } from "../types/user";
 import { storage } from "./storage";
 
 // IMPORTANTE: Configure a URL da sua API aqui
-const API_URL = "http://192.168.0.133:8000/api";
+const API_URL = "http://191.35.131.10/php82/api-eticket/public/api";
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
   },
+  timeout: 30000, // 30 segundos
 });
 
 export const apiImage = axios.create({
@@ -21,6 +23,7 @@ export const apiImage = axios.create({
     Accept: "image/*",
   },
   responseType: "blob",
+  timeout: 30000,
 });
 
 export const storeEncryptedToken = async (token: string) => {

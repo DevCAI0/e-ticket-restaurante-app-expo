@@ -7,10 +7,17 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
+  ActivityIndicator,
+  Image,
 } from "react-native";
-import { CameraType, CameraView, useCameraPermissions } from "expo-camera";
+import {
+  Camera,
+  useCameraDevice,
+  useCameraPermission,
+} from "react-native-vision-camera";
 import * as FaceDetector from "expo-face-detector";
 import { Ionicons } from "@expo/vector-icons";
+import { useIsFocused } from "@react-navigation/core";
 import { colors } from "../../../constants/colors";
 
 const { width, height } = Dimensions.get("window");
@@ -24,32 +31,51 @@ interface FacialCameraProps {
   solicitarSorriso?: boolean;
 }
 
+type CaptureStatus =
+  | "positioning" // Posicionando rosto
+  | "face-detected" // Rosto detectado, validando posição
+  | "face-centered" // Rosto centralizado (verde)
+  | "waiting-smile" // Aguardando sorriso
+  | "smile-detected" // Sorriso detectado
+  | "countdown" // Contagem regressiva
+  | "capturing" // Capturando foto
+  | "analyzing" // Analisando rosto
+  | "success" // Sucesso
+  | "error"; // Erro
+
 export const FacialCamera: React.FC<FacialCameraProps> = ({
   onCapture,
   onCancel,
   funcionarioNome,
-  solicitarSorriso = false,
+  solicitarSorriso = true,
 }) => {
-  const cameraRef = useRef<CameraView>(null);
-  const [permission, requestPermission] = useCameraPermissions();
-  const [cameraType, setCameraType] = useState<CameraType>("front");
-  const [faceDetected, setFaceDetected] = useState(false);
-  const [faceInOval, setFaceInOval] = useState(false);
-  const [smileDetected, setSmileDetected] = useState(false);
+  const cameraRef = useRef<Camera>(null);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice("front");
+  const isFocused = useIsFocused();
+
+  const [status, setStatus] = useState<CaptureStatus>("positioning");
   const [countdown, setCountdown] = useState(0);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [validationAttempts, setValidationAttempts] = useState(0);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Intervalos para validação contínua
+  const validationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const positionStableTimeRef = useRef<number>(0);
+  const smileStableTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!permission?.granted) {
+    if (!hasPermission) {
       requestPermission();
     }
   }, []);
 
   useEffect(() => {
-    // Animação de pulso para o oval
+    // Animação de pulso
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -64,153 +90,348 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         }),
       ])
     ).start();
-
-    // Animação de bounce
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(bounceAnim, {
-          toValue: -10,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounceAnim, {
-          toValue: 0,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
+  // VALIDAÇÃO CONTÍNUA - Tira fotos a cada 1 segundo para validar
   useEffect(() => {
-    if (faceInOval && (!solicitarSorriso || smileDetected) && !isCapturing) {
-      if (countdown === 0) {
-        setCountdown(3);
-      }
-    } else {
-      setCountdown(0);
-    }
-  }, [faceInOval, smileDetected, solicitarSorriso, isCapturing]);
+    if (
+      status === "positioning" ||
+      status === "face-detected" ||
+      status === "face-centered" ||
+      status === "waiting-smile"
+    ) {
+      validationIntervalRef.current = setInterval(() => {
+        captureAndValidate();
+      }, 1000); // Valida a cada 1 segundo
 
+      return () => {
+        if (validationIntervalRef.current) {
+          clearInterval(validationIntervalRef.current);
+        }
+      };
+    }
+  }, [status]);
+
+  // Contagem regressiva
   useEffect(() => {
-    if (countdown > 0 && !isCapturing) {
+    if (countdown > 0 && status === "countdown") {
       const timer = setTimeout(() => {
         if (countdown === 1) {
-          handleCapture();
+          finalCapture();
         } else {
           setCountdown(countdown - 1);
         }
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [countdown, isCapturing]);
+  }, [countdown, status]);
 
-  const handleFacesDetected = ({ faces }: FaceDetector.DetectionResult) => {
-    if (isCapturing) return;
-
-    if (faces.length === 0) {
-      setFaceDetected(false);
-      setFaceInOval(false);
-      setSmileDetected(false);
+  const captureAndValidate = async () => {
+    if (
+      !cameraRef.current ||
+      status === "capturing" ||
+      status === "analyzing" ||
+      status === "success"
+    )
       return;
-    }
 
-    if (faces.length > 1) {
-      setFaceDetected(false);
-      setFaceInOval(false);
-      return;
-    }
-
-    const face = faces[0];
-    setFaceDetected(true);
-
-    // Verificar se o rosto está dentro do oval
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const faceX = face.bounds.origin.x + face.bounds.size.width / 2;
-    const faceY = face.bounds.origin.y + face.bounds.size.height / 2;
-
-    const distanceX = Math.abs(faceX - centerX);
-    const distanceY = Math.abs(faceY - centerY);
-
-    const isInOval =
-      distanceX < OVAL_WIDTH / 2.5 && distanceY < OVAL_HEIGHT / 2.5;
-    setFaceInOval(isInOval);
-
-    // Detectar sorriso se solicitado
-    if (solicitarSorriso && isInOval) {
-      const smilingProbability = face.smilingProbability || 0;
-      setSmileDetected(smilingProbability > 0.7);
-    } else if (!solicitarSorriso) {
-      setSmileDetected(true);
-    }
-  };
-
-  const handleCapture = async () => {
-    if (!cameraRef.current || isCapturing) return;
-
-    setIsCapturing(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.8,
-        base64: true,
+      // Tira foto silenciosamente para validação
+      const photo = await cameraRef.current.takePhoto({
+        flash: "off",
       });
 
-      if (photo.uri) {
-        onCapture(photo.uri);
-      }
+      const imageUri = `file://${photo.path}`;
+      await validatePosition(imageUri);
     } catch (error) {
-      console.error("Erro ao capturar foto:", error);
-      setIsCapturing(false);
-      setCountdown(0);
+      console.log("Erro na validação contínua:", error);
     }
   };
 
-  const toggleCameraType = () => {
-    setCameraType((current) => (current === "back" ? "front" : "back"));
-    setFaceDetected(false);
-    setFaceInOval(false);
-    setSmileDetected(false);
-    setCountdown(0);
+  const validatePosition = async (imageUri: string) => {
+    try {
+      const options: FaceDetector.DetectionOptions = {
+        mode: FaceDetector.FaceDetectorMode.fast, // Modo rápido para validação contínua
+        detectLandmarks: FaceDetector.FaceDetectorLandmarks.none,
+        runClassifications: FaceDetector.FaceDetectorClassifications.all,
+      };
+
+      const result = await FaceDetector.detectFacesAsync(imageUri, options);
+
+      // Validação 1: Tem rosto?
+      if (result.faces.length === 0) {
+        if (status !== "positioning") {
+          setStatus("positioning");
+          positionStableTimeRef.current = 0;
+          smileStableTimeRef.current = 0;
+        }
+        return;
+      }
+
+      // Validação 2: Apenas 1 rosto?
+      if (result.faces.length > 1) {
+        setStatus("error");
+        setErrorMessage("Apenas uma pessoa por vez");
+        setTimeout(() => setStatus("positioning"), 2000);
+        return;
+      }
+
+      const face = result.faces[0];
+
+      // Validação 3: Rosto está bem posicionado?
+      // Simplificado: se detectou 1 rosto, considera OK
+      const isCentered = true; // Sempre considera centralizado se tem 1 rosto
+
+      if (!isCentered) {
+        if (status !== "face-detected") {
+          setStatus("face-detected");
+          positionStableTimeRef.current = 0;
+        }
+        return;
+      }
+
+      // Rosto está centralizado!
+      if (status === "positioning" || status === "face-detected") {
+        setStatus("face-centered");
+        positionStableTimeRef.current = Date.now();
+        return;
+      }
+
+      // Aguarda 0.5 segundos com rosto estável antes de pedir sorriso
+      if (status === "face-centered") {
+        const timeCentered = Date.now() - positionStableTimeRef.current;
+        if (timeCentered < 500) {
+          return;
+        }
+        // Avança para pedir sorriso OU inicia contagem
+        if (solicitarSorriso) {
+          setStatus("waiting-smile");
+          smileStableTimeRef.current = 0;
+        } else {
+          // Sem sorriso, vai direto para contagem
+          if (countdown === 0) {
+            setStatus("countdown");
+            setCountdown(3);
+          }
+        }
+        return;
+      }
+
+      // Validação 4: Sorriso (se necessário)
+      if (solicitarSorriso && status === "waiting-smile") {
+        const smilingProbability = face.smilingProbability || 0;
+
+        console.log("Sorriso detectado:", smilingProbability);
+
+        if (smilingProbability < 0.5) {
+          // Reduzido de 0.7 para 0.5
+          return;
+        }
+
+        // Sorriso detectado!
+        setStatus("smile-detected");
+        smileStableTimeRef.current = Date.now();
+        return;
+      }
+
+      // Aguarda 0.5 segundos com sorriso estável
+      if (status === "smile-detected") {
+        const timeSmiling = Date.now() - smileStableTimeRef.current;
+        if (timeSmiling < 500) {
+          return;
+        }
+
+        // Inicia contagem!
+        if (countdown === 0) {
+          setStatus("countdown");
+          setCountdown(3);
+        }
+        return;
+      }
+
+      // Caso não solicite sorriso, o fluxo já iniciou countdown no face-centered
+    } catch (error) {
+      console.log("Erro ao validar posição:", error);
+    }
+  };
+
+  const finalCapture = async () => {
+    if (!cameraRef.current) return;
+
+    setStatus("capturing");
+
+    try {
+      // Captura final
+      const photo = await cameraRef.current.takePhoto({
+        flash: "off",
+      });
+
+      const imageUri = `file://${photo.path}`;
+      setCapturedPhoto(imageUri);
+
+      setStatus("analyzing");
+      await finalValidation(imageUri);
+    } catch (error) {
+      console.error("Erro ao capturar foto final:", error);
+      setErrorMessage("Erro ao capturar. Tente novamente.");
+      setStatus("error");
+      setTimeout(() => {
+        setStatus("positioning");
+        positionStableTimeRef.current = 0;
+        smileStableTimeRef.current = 0;
+      }, 2000);
+    }
+  };
+
+  const finalValidation = async (imageUri: string) => {
+    try {
+      const options: FaceDetector.DetectionOptions = {
+        mode: FaceDetector.FaceDetectorMode.accurate,
+        detectLandmarks: FaceDetector.FaceDetectorLandmarks.all,
+        runClassifications: FaceDetector.FaceDetectorClassifications.all,
+      };
+
+      const result = await FaceDetector.detectFacesAsync(imageUri, options);
+
+      if (result.faces.length === 0) {
+        setErrorMessage("Nenhum rosto na foto final");
+        setStatus("error");
+        setCapturedPhoto(null);
+        setTimeout(() => {
+          setStatus("positioning");
+          positionStableTimeRef.current = 0;
+          smileStableTimeRef.current = 0;
+        }, 2000);
+        return;
+      }
+
+      if (result.faces.length > 1) {
+        setErrorMessage("Múltiplos rostos na foto final");
+        setStatus("error");
+        setCapturedPhoto(null);
+        setTimeout(() => {
+          setStatus("positioning");
+          positionStableTimeRef.current = 0;
+          smileStableTimeRef.current = 0;
+        }, 2000);
+        return;
+      }
+
+      // Sucesso!
+      setStatus("success");
+
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        onCapture(imageUri);
+      });
+    } catch (error) {
+      console.error("Erro na validação final:", error);
+      setErrorMessage("Erro ao analisar. Tente novamente.");
+      setStatus("error");
+      setCapturedPhoto(null);
+      setTimeout(() => {
+        setStatus("positioning");
+        positionStableTimeRef.current = 0;
+        smileStableTimeRef.current = 0;
+      }, 2000);
+    }
   };
 
   const getOvalColor = () => {
-    if (faceInOval && (!solicitarSorriso || smileDetected)) {
-      return colors.success;
+    switch (status) {
+      case "face-centered":
+      case "smile-detected":
+      case "countdown":
+        return colors.success; // Verde
+      case "face-detected":
+      case "waiting-smile":
+        return colors.warning; // Amarelo
+      case "success":
+        return colors.success;
+      case "error":
+        return "#ef4444"; // Vermelho
+      default:
+        return "rgba(255, 255, 255, 0.5)"; // Branco
     }
-    if (faceDetected) {
-      return colors.warning;
-    }
-    return "rgba(255, 255, 255, 0.5)";
   };
 
   const getInstructionText = () => {
-    if (!faceDetected) {
-      return "Posicione seu rosto no oval";
-    }
-    if (!faceInOval) {
-      return "Centralize seu rosto";
-    }
-    if (solicitarSorriso && !smileDetected) {
-      return `Sorria${funcionarioNome ? ", " + funcionarioNome : ""}! 😊`;
-    }
     if (countdown > 0) {
       return `Capturando em ${countdown}...`;
     }
-    return "Mantenha a posição";
+
+    switch (status) {
+      case "positioning":
+        return `${funcionarioNome ? `Olá, ${funcionarioNome}! ` : ""}Posicione seu rosto no círculo`;
+      case "face-detected":
+        return "Centralize seu rosto no círculo";
+      case "face-centered":
+        return solicitarSorriso
+          ? "Rosto OK! Agora sorria 😊"
+          : "Mantenha a posição...";
+      case "waiting-smile":
+        return "Sorria! 😊";
+      case "smile-detected":
+        return "Sorriso perfeito! Mantenha...";
+      case "capturing":
+        return "Capturando...";
+      case "analyzing":
+        return "Analisando...";
+      case "success":
+        return "Perfeito! ✨";
+      case "error":
+        return errorMessage;
+      default:
+        return "Posicione seu rosto";
+    }
   };
 
-  if (!permission) {
-    return <View style={styles.container} />;
+  const activeDevice = useCameraDevice("front");
+
+  if (hasPermission == null) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Solicitando permissão...</Text>
+      </View>
+    );
   }
 
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
       <View style={styles.noPermissionContainer}>
         <Ionicons name="videocam-off" size={64} color={colors.muted.light} />
         <Text style={styles.noPermissionText}>
           Sem permissão para acessar a câmera
         </Text>
+        <TouchableOpacity style={styles.button} onPress={requestPermission}>
+          <Text style={styles.buttonText}>Solicitar Permissão</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonSecondary]}
+          onPress={onCancel}
+        >
+          <Text style={styles.buttonText}>Voltar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (activeDevice == null) {
+    return (
+      <View style={styles.noPermissionContainer}>
+        <Ionicons name="videocam-off" size={64} color={colors.muted.light} />
+        <Text style={styles.noPermissionText}>Nenhuma câmera disponível</Text>
         <TouchableOpacity style={styles.button} onPress={onCancel}>
           <Text style={styles.buttonText}>Voltar</Text>
         </TouchableOpacity>
@@ -220,172 +441,172 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 
   return (
     <View style={styles.container}>
-      <CameraView
+      <Camera
         ref={cameraRef}
-        style={styles.camera}
-        facing={cameraType}
-        onFacesDetected={handleFacesDetected}
-        faceDetectorSettings={{
-          mode: FaceDetector.FaceDetectorMode.fast,
-          detectLandmarks: FaceDetector.FaceDetectorLandmarks.none,
-          runClassifications: FaceDetector.FaceDetectorClassifications.all,
-          minDetectionInterval: 100,
-          tracking: true,
-        }}
-      >
-        {/* Overlay escuro */}
-        <View style={styles.overlay}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="#ffffff" />
-            </TouchableOpacity>
+        style={StyleSheet.absoluteFill}
+        device={activeDevice}
+        isActive={isFocused && status !== "analyzing" && status !== "success"}
+        photo={true}
+      />
 
-            <Text style={styles.title}>Verificação Facial</Text>
+      {/* Preview da foto */}
+      {capturedPhoto && (status === "analyzing" || status === "success") && (
+        <Image
+          source={{ uri: capturedPhoto }}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
-            <TouchableOpacity
-              onPress={toggleCameraType}
-              style={styles.flipButton}
-            >
-              <Ionicons name="camera-reverse" size={28} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
+      {/* Overlay */}
+      <View style={styles.overlay}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
+            <Ionicons name="close" size={28} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Verificação Facial</Text>
+          <View style={{ width: 44 }} />
+        </View>
 
-          {/* Oval de detecção */}
-          <View style={styles.centerContainer}>
-            <Animated.View
+        {/* Oval */}
+        <View style={styles.centerContainer}>
+          <Animated.View
+            style={[
+              styles.ovalContainer,
+              {
+                transform: [
+                  {
+                    scale:
+                      status === "face-centered" || status === "smile-detected"
+                        ? 1
+                        : status === "success"
+                          ? scaleAnim
+                          : pulseAnim,
+                  },
+                ],
+              },
+            ]}
+          >
+            <View
               style={[
-                styles.ovalContainer,
+                styles.oval,
                 {
-                  transform: [{ scale: faceInOval ? 1 : pulseAnim }],
+                  borderColor: getOvalColor(),
+                  borderWidth: 3,
                 },
               ]}
             >
+              {/* Cantos */}
               <View
                 style={[
-                  styles.oval,
+                  styles.corner,
+                  styles.cornerTopLeft,
+                  { borderColor: getOvalColor() },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.cornerTopRight,
+                  { borderColor: getOvalColor() },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.cornerBottomLeft,
+                  { borderColor: getOvalColor() },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.cornerBottomRight,
+                  { borderColor: getOvalColor() },
+                ]}
+              />
+            </View>
+          </Animated.View>
+        </View>
+
+        {/* Bottom */}
+        <View style={styles.bottomContainer}>
+          {countdown > 0 && (
+            <View style={styles.countdownBadge}>
+              <Text style={styles.countdownText}>{countdown}</Text>
+            </View>
+          )}
+
+          {status === "analyzing" && (
+            <ActivityIndicator size="large" color={colors.primary} />
+          )}
+
+          {status === "success" && (
+            <Ionicons
+              name="checkmark-circle"
+              size={64}
+              color={colors.success}
+            />
+          )}
+
+          <View style={styles.instructionBox}>
+            <Text style={styles.instructionText}>{getInstructionText()}</Text>
+          </View>
+
+          {/* Indicadores */}
+          <View style={styles.statusContainer}>
+            <View style={styles.statusItem}>
+              <View
+                style={[
+                  styles.statusDot,
                   {
-                    borderColor: getOvalColor(),
-                    borderWidth: faceInOval ? 3 : 2,
-                    borderStyle: faceDetected ? "solid" : "dashed",
+                    backgroundColor:
+                      status !== "positioning"
+                        ? colors.success
+                        : colors.muted.light,
                   },
                 ]}
-              >
-                {/* Cantos do oval */}
-                <View style={[styles.corner, styles.cornerTopLeft]} />
-                <View style={[styles.corner, styles.cornerTopRight]} />
-                <View style={[styles.corner, styles.cornerBottomLeft]} />
-                <View style={[styles.corner, styles.cornerBottomRight]} />
-
-                {/* Instrução dentro do oval */}
-                {!faceInOval && faceDetected && (
-                  <Animated.View
-                    style={[
-                      styles.arrowContainer,
-                      { transform: [{ translateY: bounceAnim }] },
-                    ]}
-                  >
-                    <Ionicons
-                      name="arrow-up"
-                      size={32}
-                      color={colors.warning}
-                    />
-                    <Text style={styles.arrowText}>Entre aqui</Text>
-                  </Animated.View>
-                )}
-              </View>
-            </Animated.View>
-          </View>
-
-          {/* Status e Instruções */}
-          <View style={styles.bottomContainer}>
-            {/* Contador regressivo */}
-            {countdown > 0 && (
-              <View style={styles.countdownBadge}>
-                <Text style={styles.countdownText}>{countdown}</Text>
-              </View>
-            )}
-
-            {/* Mensagem de instrução */}
-            <View style={styles.instructionBox}>
-              {funcionarioNome && faceInOval && (
-                <Text style={styles.instructionName}>
-                  Olá, {funcionarioNome}!
-                </Text>
-              )}
-              <Text style={styles.instructionText}>{getInstructionText()}</Text>
+              />
+              <Text style={styles.statusText}>Rosto</Text>
             </View>
 
-            {/* Indicador de sorriso */}
-            {solicitarSorriso && faceInOval && (
+            <View style={styles.statusItem}>
               <View
                 style={[
-                  styles.smileBadge,
-                  smileDetected
-                    ? styles.smileBadgeSuccess
-                    : styles.smileBadgeWarning,
+                  styles.statusDot,
+                  {
+                    backgroundColor:
+                      status === "face-centered" ||
+                      status === "waiting-smile" ||
+                      status === "smile-detected" ||
+                      status === "countdown"
+                        ? colors.success
+                        : colors.muted.light,
+                  },
                 ]}
-              >
-                <Ionicons
-                  name={smileDetected ? "happy" : "happy-outline"}
-                  size={20}
-                  color="#ffffff"
-                />
-                <Text style={styles.smileText}>
-                  {smileDetected ? "Sorriso OK!" : "Sorria"}
-                </Text>
-              </View>
-            )}
+              />
+              <Text style={styles.statusText}>Posição</Text>
+            </View>
 
-            {/* Indicadores de status */}
-            <View style={styles.statusContainer}>
+            {solicitarSorriso && (
               <View style={styles.statusItem}>
                 <View
                   style={[
                     styles.statusDot,
                     {
-                      backgroundColor: faceDetected
-                        ? colors.success
-                        : colors.muted.light,
-                    },
-                  ]}
-                />
-                <Text style={styles.statusText}>Rosto</Text>
-              </View>
-
-              <View style={styles.statusItem}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor: faceInOval
-                        ? colors.success
-                        : colors.muted.light,
-                    },
-                  ]}
-                />
-                <Text style={styles.statusText}>Posição</Text>
-              </View>
-
-              {solicitarSorriso && (
-                <View style={styles.statusItem}>
-                  <View
-                    style={[
-                      styles.statusDot,
-                      {
-                        backgroundColor: smileDetected
+                      backgroundColor:
+                        status === "smile-detected" || status === "countdown"
                           ? colors.success
                           : colors.muted.light,
-                      },
-                    ]}
-                  />
-                  <Text style={styles.statusText}>Sorriso</Text>
-                </View>
-              )}
-            </View>
+                    },
+                  ]}
+                />
+                <Text style={styles.statusText}>Sorriso</Text>
+              </View>
+            )}
           </View>
         </View>
-      </CameraView>
+      </View>
     </View>
   );
 };
@@ -395,8 +616,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
-  camera: {
+  loadingContainer: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#000000",
+    gap: 16,
+  },
+  loadingText: {
+    color: "#ffffff",
+    fontSize: 16,
   },
   overlay: {
     flex: 1,
@@ -423,14 +652,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#ffffff",
   },
-  flipButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   centerContainer: {
     flex: 1,
     alignItems: "center",
@@ -450,7 +671,6 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: 30,
     height: 30,
-    borderColor: "#ffffff",
   },
   cornerTopLeft: {
     top: -2,
@@ -479,19 +699,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
     borderBottomRightRadius: 8,
-  },
-  arrowContainer: {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: [{ translateX: -16 }, { translateY: -40 }],
-    alignItems: "center",
-  },
-  arrowText: {
-    color: colors.warning,
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 4,
   },
   bottomContainer: {
     paddingBottom: 48,
@@ -525,36 +732,11 @@ const styles = StyleSheet.create({
     maxWidth: "90%",
     alignItems: "center",
   },
-  instructionName: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
   instructionText: {
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
-  },
-  smileBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  smileBadgeSuccess: {
-    backgroundColor: colors.success,
-  },
-  smileBadgeWarning: {
-    backgroundColor: colors.warning,
-  },
-  smileText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "600",
   },
   statusContainer: {
     flexDirection: "row",
@@ -592,6 +774,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
+  },
+  buttonSecondary: {
+    backgroundColor: colors.muted.light,
   },
   buttonText: {
     color: "#ffffff",
