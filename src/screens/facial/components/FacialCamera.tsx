@@ -1,4 +1,6 @@
 // src/screens/facial/components/FacialCamera.tsx
+// SEM CÍRCULO - DETECÇÃO LIVRE COM DESAFIOS DE VIVACIDADE
+
 import React, { useRef, useState, useEffect } from "react";
 import {
   View,
@@ -21,52 +23,86 @@ import { useIsFocused } from "@react-navigation/core";
 import { colors } from "../../../constants/colors";
 
 const { width, height } = Dimensions.get("window");
-const OVAL_WIDTH = 240;
-const OVAL_HEIGHT = 320;
 
 interface FacialCameraProps {
   onCapture: (imageUri: string) => void;
   onCancel: () => void;
   funcionarioNome?: string;
   solicitarSorriso?: boolean;
+  cameraType?: "front" | "back";
 }
 
+type LivenessChallenge = "blink" | "turn-left" | "turn-right" | "smile";
+
 type CaptureStatus =
-  | "positioning" // Posicionando rosto
-  | "face-detected" // Rosto detectado, validando posição
-  | "face-centered" // Rosto centralizado (verde)
-  | "waiting-smile" // Aguardando sorriso
-  | "smile-detected" // Sorriso detectado
-  | "countdown" // Contagem regressiva
-  | "capturing" // Capturando foto
-  | "analyzing" // Analisando rosto
-  | "success" // Sucesso
-  | "error"; // Erro
+  | "waiting-face"
+  | "face-ok"
+  | "challenge-1"
+  | "challenge-1-ok"
+  | "challenge-2"
+  | "challenge-2-ok"
+  | "challenge-3"
+  | "challenge-3-ok"
+  | "ready-to-capture"
+  | "capturing"
+  | "analyzing"
+  | "success"
+  | "error";
 
 export const FacialCamera: React.FC<FacialCameraProps> = ({
   onCapture,
   onCancel,
   funcionarioNome,
   solicitarSorriso = true,
+  cameraType = "front",
 }) => {
   const cameraRef = useRef<Camera>(null);
   const { hasPermission, requestPermission } = useCameraPermission();
-  const device = useCameraDevice("front");
   const isFocused = useIsFocused();
 
-  const [status, setStatus] = useState<CaptureStatus>("positioning");
-  const [countdown, setCountdown] = useState(0);
+  const [status, setStatus] = useState<CaptureStatus>("waiting-face");
   const [errorMessage, setErrorMessage] = useState("");
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
-  const [validationAttempts, setValidationAttempts] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(0);
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  // ✅ 3 DESAFIOS: VIRAR, PISCAR, SORRIR
+  const challenge1Ref = useRef<LivenessChallenge | null>(null);
+  const challenge2Ref = useRef<LivenessChallenge | null>(null);
+  const challenge3Ref = useRef<LivenessChallenge | null>(null);
+
+  // Estados para detecção
+  const prevYawRef = useRef<number>(0);
+  const prevLeftEyeRef = useRef<number>(1);
+  const prevRightEyeRef = useRef<number>(1);
+  const turnDetectedRef = useRef<boolean>(false);
+
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  // Intervalos para validação contínua
   const validationIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const positionStableTimeRef = useRef<number>(0);
-  const smileStableTimeRef = useRef<number>(0);
+  const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    generateRandomChallenges();
+  }, []);
+
+  const generateRandomChallenges = () => {
+    // ✅ EMBARALHA OS 3 DESAFIOS
+    const availableChallenges: LivenessChallenge[] = [
+      "blink",
+      "turn-left",
+      "turn-right",
+      "smile",
+    ];
+
+    const shuffled = availableChallenges.sort(() => Math.random() - 0.5);
+    challenge1Ref.current = shuffled[0];
+    challenge2Ref.current = shuffled[1];
+    challenge3Ref.current = shuffled[2];
+
+    console.log(
+      `🎲 Desafios: 1=${challenge1Ref.current} 2=${challenge2Ref.current} 3=${challenge3Ref.current}`
+    );
+  };
 
   useEffect(() => {
     if (!hasPermission) {
@@ -75,211 +111,367 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   }, []);
 
   useEffect(() => {
-    // Animação de pulso
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.05,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-  }, []);
+    const activeStates: CaptureStatus[] = [
+      "waiting-face",
+      "face-ok",
+      "challenge-1",
+      "challenge-2",
+      "challenge-3",
+    ];
 
-  // VALIDAÇÃO CONTÍNUA - Tira fotos a cada 1 segundo para validar
-  useEffect(() => {
-    if (
-      status === "positioning" ||
-      status === "face-detected" ||
-      status === "face-centered" ||
-      status === "waiting-smile"
-    ) {
+    if (activeStates.includes(status)) {
       validationIntervalRef.current = setInterval(() => {
-        captureAndValidate();
-      }, 1000); // Valida a cada 1 segundo
+        validateFrame();
+      }, 600); // Mais rápido para virar
 
       return () => {
         if (validationIntervalRef.current) {
           clearInterval(validationIntervalRef.current);
         }
       };
+    } else {
+      if (validationIntervalRef.current) {
+        clearInterval(validationIntervalRef.current);
+        validationIntervalRef.current = null;
+      }
     }
   }, [status]);
 
-  // Contagem regressiva
   useEffect(() => {
-    if (countdown > 0 && status === "countdown") {
-      const timer = setTimeout(() => {
-        if (countdown === 1) {
-          finalCapture();
-        } else {
-          setCountdown(countdown - 1);
-        }
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [countdown, status]);
+    return () => {
+      if (validationIntervalRef.current)
+        clearInterval(validationIntervalRef.current);
+      if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+    };
+  }, []);
 
-  const captureAndValidate = async () => {
-    if (
-      !cameraRef.current ||
-      status === "capturing" ||
-      status === "analyzing" ||
-      status === "success"
-    )
-      return;
+  const validateFrame = async () => {
+    if (!cameraRef.current) return;
+
+    const skipStates: CaptureStatus[] = [
+      "error",
+      "challenge-1-ok",
+      "challenge-2-ok",
+      "challenge-3-ok",
+      "ready-to-capture",
+      "capturing",
+      "analyzing",
+      "success",
+    ];
+    if (skipStates.includes(status)) return;
 
     try {
-      // Tira foto silenciosamente para validação
-      const photo = await cameraRef.current.takePhoto({
-        flash: "off",
-      });
-
+      const photo = await cameraRef.current.takePhoto({ flash: "off" });
       const imageUri = `file://${photo.path}`;
-      await validatePosition(imageUri);
+      await checkFaceAndLiveness(imageUri);
     } catch (error) {
-      console.log("Erro na validação contínua:", error);
+      console.log("Erro na validação:", error);
     }
   };
 
-  const validatePosition = async (imageUri: string) => {
+  const checkFaceAndLiveness = async (imageUri: string) => {
     try {
       const options: FaceDetector.DetectionOptions = {
-        mode: FaceDetector.FaceDetectorMode.fast, // Modo rápido para validação contínua
-        detectLandmarks: FaceDetector.FaceDetectorLandmarks.none,
+        mode: FaceDetector.FaceDetectorMode.fast,
+        detectLandmarks: FaceDetector.FaceDetectorLandmarks.all,
         runClassifications: FaceDetector.FaceDetectorClassifications.all,
       };
 
       const result = await FaceDetector.detectFacesAsync(imageUri, options);
 
-      // Validação 1: Tem rosto?
+      // SEM ROSTO - Mais tolerante, não reseta imediatamente
       if (result.faces.length === 0) {
-        if (status !== "positioning") {
-          setStatus("positioning");
-          positionStableTimeRef.current = 0;
-          smileStableTimeRef.current = 0;
+        // Ignora perda temporária durante piscar ou virar
+        const isBlinking =
+          (status === "challenge-1" && challenge1Ref.current === "blink") ||
+          (status === "challenge-2" && challenge2Ref.current === "blink") ||
+          (status === "challenge-3" && challenge3Ref.current === "blink");
+
+        const isTurning =
+          (status === "challenge-1" &&
+            (challenge1Ref.current === "turn-left" ||
+              challenge1Ref.current === "turn-right")) ||
+          (status === "challenge-2" &&
+            (challenge2Ref.current === "turn-left" ||
+              challenge2Ref.current === "turn-right")) ||
+          (status === "challenge-3" &&
+            (challenge3Ref.current === "turn-left" ||
+              challenge3Ref.current === "turn-right"));
+
+        if (isBlinking || isTurning) {
+          console.log("⏸️ Perda temporária de rosto - ignorando");
+          return;
         }
-        return;
+
+        // Só dá erro se estiver esperando rosto inicial
+        if (status === "waiting-face") {
+          return; // Aguarda rosto aparecer
+        }
+
+        return; // Mais tolerante em geral
       }
 
-      // Validação 2: Apenas 1 rosto?
+      // MÚLTIPLOS ROSTOS
       if (result.faces.length > 1) {
         setStatus("error");
         setErrorMessage("Apenas uma pessoa por vez");
-        setTimeout(() => setStatus("positioning"), 2000);
+        setTimeout(() => resetToStart(), 3000);
         return;
       }
 
       const face = result.faces[0];
+      const leftEyeOpen = face.leftEyeOpenProbability || 0;
+      const rightEyeOpen = face.rightEyeOpenProbability || 0;
+      const smilingProbability = face.smilingProbability || 0;
+      const yawAngle = face.yawAngle || 0;
 
-      // Validação 3: Rosto está bem posicionado?
-      // Simplificado: se detectou 1 rosto, considera OK
-      const isCentered = true; // Sempre considera centralizado se tem 1 rosto
+      console.log(
+        `👁️ E${Math.round(leftEyeOpen * 100)}% D${Math.round(rightEyeOpen * 100)}% | 😊 ${Math.round(smilingProbability * 100)}% | 🔄 ${Math.round(yawAngle)}°`
+      );
 
-      if (!isCentered) {
-        if (status !== "face-detected") {
-          setStatus("face-detected");
-          positionStableTimeRef.current = 0;
-        }
-        return;
-      }
+      // MÁQUINA DE ESTADOS
+      if (status === "waiting-face") {
+        console.log("✅ STEP 1: Rosto detectado!");
+        setStatus("face-ok");
 
-      // Rosto está centralizado!
-      if (status === "positioning" || status === "face-detected") {
-        setStatus("face-centered");
-        positionStableTimeRef.current = Date.now();
-        return;
-      }
+        stepTimerRef.current = setTimeout(() => {
+          console.log(`➡️ STEP 2: Desafio 1 = ${challenge1Ref.current}`);
+          setStatus("challenge-1");
+          resetChallengeState();
+          startCountdown(12);
+        }, 2000);
+      } else if (status === "challenge-1") {
+        const completed = checkChallengeCompletion(
+          challenge1Ref.current!,
+          leftEyeOpen,
+          rightEyeOpen,
+          smilingProbability,
+          yawAngle
+        );
 
-      // Aguarda 0.5 segundos com rosto estável antes de pedir sorriso
-      if (status === "face-centered") {
-        const timeCentered = Date.now() - positionStableTimeRef.current;
-        if (timeCentered < 500) {
-          return;
-        }
-        // Avança para pedir sorriso OU inicia contagem
-        if (solicitarSorriso) {
-          setStatus("waiting-smile");
-          smileStableTimeRef.current = 0;
-        } else {
-          // Sem sorriso, vai direto para contagem
-          if (countdown === 0) {
-            setStatus("countdown");
-            setCountdown(3);
+        if (completed) {
+          console.log(`✅ Desafio 1 (${challenge1Ref.current}) COMPLETO!`);
+
+          // ✅ LIMPA O COUNTDOWN IMEDIATAMENTE!
+          if (stepTimerRef.current) {
+            clearInterval(stepTimerRef.current);
+            clearTimeout(stepTimerRef.current);
+            stepTimerRef.current = null;
           }
+
+          setStatus("challenge-1-ok");
+          setTimeRemaining(0);
+
+          stepTimerRef.current = setTimeout(() => {
+            console.log(`➡️ STEP 3: Desafio 2 = ${challenge2Ref.current}`);
+            setStatus("challenge-2");
+            resetChallengeState();
+            startCountdown(12);
+          }, 1000);
         }
-        return;
+      } else if (status === "challenge-2") {
+        const completed = checkChallengeCompletion(
+          challenge2Ref.current!,
+          leftEyeOpen,
+          rightEyeOpen,
+          smilingProbability,
+          yawAngle
+        );
+
+        if (completed) {
+          console.log(`✅ Desafio 2 (${challenge2Ref.current}) COMPLETO!`);
+
+          // ✅ LIMPA O COUNTDOWN IMEDIATAMENTE!
+          if (stepTimerRef.current) {
+            clearInterval(stepTimerRef.current);
+            clearTimeout(stepTimerRef.current);
+            stepTimerRef.current = null;
+          }
+
+          setStatus("challenge-2-ok");
+          setTimeRemaining(0);
+
+          stepTimerRef.current = setTimeout(() => {
+            console.log(`➡️ STEP 4: Desafio 3 = ${challenge3Ref.current}`);
+            setStatus("challenge-3");
+            resetChallengeState();
+            startCountdown(12);
+          }, 1000);
+        }
+      } else if (status === "challenge-3") {
+        const completed = checkChallengeCompletion(
+          challenge3Ref.current!,
+          leftEyeOpen,
+          rightEyeOpen,
+          smilingProbability,
+          yawAngle
+        );
+
+        if (completed) {
+          console.log(`✅ Desafio 3 (${challenge3Ref.current}) COMPLETO!`);
+
+          // ✅ LIMPA O COUNTDOWN IMEDIATAMENTE!
+          if (stepTimerRef.current) {
+            clearInterval(stepTimerRef.current);
+            clearTimeout(stepTimerRef.current);
+            stepTimerRef.current = null;
+          }
+
+          setStatus("challenge-3-ok");
+          setTimeRemaining(0);
+
+          stepTimerRef.current = setTimeout(() => {
+            prepareToCapture();
+          }, 1000);
+        }
       }
-
-      // Validação 4: Sorriso (se necessário)
-      if (solicitarSorriso && status === "waiting-smile") {
-        const smilingProbability = face.smilingProbability || 0;
-
-        console.log("Sorriso detectado:", smilingProbability);
-
-        if (smilingProbability < 0.5) {
-          // Reduzido de 0.7 para 0.5
-          return;
-        }
-
-        // Sorriso detectado!
-        setStatus("smile-detected");
-        smileStableTimeRef.current = Date.now();
-        return;
-      }
-
-      // Aguarda 0.5 segundos com sorriso estável
-      if (status === "smile-detected") {
-        const timeSmiling = Date.now() - smileStableTimeRef.current;
-        if (timeSmiling < 500) {
-          return;
-        }
-
-        // Inicia contagem!
-        if (countdown === 0) {
-          setStatus("countdown");
-          setCountdown(3);
-        }
-        return;
-      }
-
-      // Caso não solicite sorriso, o fluxo já iniciou countdown no face-centered
     } catch (error) {
-      console.log("Erro ao validar posição:", error);
+      console.log("Erro ao analisar:", error);
     }
   };
 
-  const finalCapture = async () => {
+  const checkChallengeCompletion = (
+    challenge: LivenessChallenge,
+    leftEyeOpen: number,
+    rightEyeOpen: number,
+    smilingProbability: number,
+    yawAngle: number
+  ): boolean => {
+    switch (challenge) {
+      case "blink":
+        const leftChange = Math.abs(leftEyeOpen - prevLeftEyeRef.current);
+        const rightChange = Math.abs(rightEyeOpen - prevRightEyeRef.current);
+        const totalChange = leftChange + rightChange;
+
+        prevLeftEyeRef.current = leftEyeOpen;
+        prevRightEyeRef.current = rightEyeOpen;
+
+        if (totalChange > 0.8) {
+          console.log(
+            `👁️ PISCADA! Variação: ${Math.round(totalChange * 100)}%`
+          );
+          return true;
+        }
+        break;
+
+      case "turn-left":
+        // Detecta virada para esquerda
+        if (yawAngle < -15 && !turnDetectedRef.current) {
+          console.log(`👈 Virou ESQUERDA! (${yawAngle.toFixed(1)}°)`);
+          turnDetectedRef.current = true;
+          prevYawRef.current = yawAngle;
+          return false;
+        }
+
+        // Detecta retorno
+        if (turnDetectedRef.current && yawAngle > prevYawRef.current + 8) {
+          console.log(
+            `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
+          );
+          return true;
+        }
+
+        if (turnDetectedRef.current && yawAngle < prevYawRef.current) {
+          prevYawRef.current = yawAngle;
+        }
+        break;
+
+      case "turn-right":
+        // Detecta virada para direita
+        if (yawAngle > 15 && !turnDetectedRef.current) {
+          console.log(`👉 Virou DIREITA! (${yawAngle.toFixed(1)}°)`);
+          turnDetectedRef.current = true;
+          prevYawRef.current = yawAngle;
+          return false;
+        }
+
+        // Detecta retorno
+        if (turnDetectedRef.current && yawAngle < prevYawRef.current - 8) {
+          console.log(
+            `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
+          );
+          return true;
+        }
+
+        if (turnDetectedRef.current && yawAngle > prevYawRef.current) {
+          prevYawRef.current = yawAngle;
+        }
+        break;
+
+      case "smile":
+        if (smilingProbability >= 0.5) {
+          console.log(`😊 Sorriso! (${Math.round(smilingProbability * 100)}%)`);
+          return true;
+        }
+        break;
+    }
+
+    return false;
+  };
+
+  const resetChallengeState = () => {
+    turnDetectedRef.current = false;
+    prevYawRef.current = 0;
+    prevLeftEyeRef.current = 1;
+    prevRightEyeRef.current = 1;
+  };
+
+  const startCountdown = (seconds: number) => {
+    // ✅ LIMPA countdown anterior antes de criar novo
+    if (stepTimerRef.current) {
+      clearTimeout(stepTimerRef.current);
+      stepTimerRef.current = null;
+    }
+
+    setTimeRemaining(seconds);
+
+    const countdown = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(countdown);
+          console.log(`⏰ Timeout do desafio`);
+          setStatus("error");
+          setErrorMessage(`Você não completou o desafio. Tente novamente.`);
+          setTimeout(() => resetToStart(), 3000);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // ✅ SALVA referência do countdown para poder limpar
+    stepTimerRef.current = countdown as any;
+  };
+
+  const prepareToCapture = () => {
+    console.log("🎯 STEP 5: Preparando captura...");
+    setStatus("ready-to-capture");
+
+    stepTimerRef.current = setTimeout(() => {
+      capturePhoto();
+    }, 1000);
+  };
+
+  const capturePhoto = async () => {
     if (!cameraRef.current) return;
 
+    console.log("📸 STEP 6: Capturando...");
     setStatus("capturing");
 
-    try {
-      // Captura final
-      const photo = await cameraRef.current.takePhoto({
-        flash: "off",
-      });
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
+    try {
+      const photo = await cameraRef.current.takePhoto({ flash: "off" });
       const imageUri = `file://${photo.path}`;
       setCapturedPhoto(imageUri);
 
       setStatus("analyzing");
       await finalValidation(imageUri);
     } catch (error) {
-      console.error("Erro ao capturar foto final:", error);
-      setErrorMessage("Erro ao capturar. Tente novamente.");
+      console.error("Erro ao capturar:", error);
       setStatus("error");
-      setTimeout(() => {
-        setStatus("positioning");
-        positionStableTimeRef.current = 0;
-        smileStableTimeRef.current = 0;
-      }, 2000);
+      setErrorMessage("Erro ao capturar foto.");
+      setTimeout(() => resetToStart(), 3000);
     }
   };
 
@@ -293,31 +485,15 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 
       const result = await FaceDetector.detectFacesAsync(imageUri, options);
 
-      if (result.faces.length === 0) {
-        setErrorMessage("Nenhum rosto na foto final");
+      if (result.faces.length !== 1) {
         setStatus("error");
+        setErrorMessage("Erro na foto final");
         setCapturedPhoto(null);
-        setTimeout(() => {
-          setStatus("positioning");
-          positionStableTimeRef.current = 0;
-          smileStableTimeRef.current = 0;
-        }, 2000);
+        setTimeout(() => resetToStart(), 3000);
         return;
       }
 
-      if (result.faces.length > 1) {
-        setErrorMessage("Múltiplos rostos na foto final");
-        setStatus("error");
-        setCapturedPhoto(null);
-        setTimeout(() => {
-          setStatus("positioning");
-          positionStableTimeRef.current = 0;
-          smileStableTimeRef.current = 0;
-        }, 2000);
-        return;
-      }
-
-      // Sucesso!
+      console.log("✅ STEP 7: SUCESSO!");
       setStatus("success");
 
       Animated.sequence([
@@ -335,68 +511,76 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         onCapture(imageUri);
       });
     } catch (error) {
-      console.error("Erro na validação final:", error);
-      setErrorMessage("Erro ao analisar. Tente novamente.");
+      console.error("Erro validação final:", error);
       setStatus("error");
+      setErrorMessage("Erro ao validar foto");
       setCapturedPhoto(null);
-      setTimeout(() => {
-        setStatus("positioning");
-        positionStableTimeRef.current = 0;
-        smileStableTimeRef.current = 0;
-      }, 2000);
+      setTimeout(() => resetToStart(), 3000);
     }
   };
 
-  const getOvalColor = () => {
-    switch (status) {
-      case "face-centered":
-      case "smile-detected":
-      case "countdown":
-        return colors.success; // Verde
-      case "face-detected":
-      case "waiting-smile":
-        return colors.warning; // Amarelo
-      case "success":
-        return colors.success;
-      case "error":
-        return "#ef4444"; // Vermelho
+  const resetToStart = () => {
+    console.log("🔄 Resetando...");
+    setStatus("waiting-face");
+    setTimeRemaining(0);
+    setCapturedPhoto(null);
+    setErrorMessage("");
+    resetChallengeState();
+    if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
+    generateRandomChallenges();
+  };
+
+  const getChallengeDisplayName = (
+    challenge: LivenessChallenge | null
+  ): string => {
+    switch (challenge) {
+      case "blink":
+        return "👁️ PISQUE os olhos";
+      case "turn-left":
+        return "👈 Vire o rosto para ESQUERDA";
+      case "turn-right":
+        return "👉 Vire o rosto para DIREITA";
+      case "smile":
+        return "😊 SORRIA";
       default:
-        return "rgba(255, 255, 255, 0.5)"; // Branco
+        return "Aguarde...";
     }
   };
 
   const getInstructionText = () => {
-    if (countdown > 0) {
-      return `Capturando em ${countdown}...`;
-    }
-
     switch (status) {
-      case "positioning":
-        return `${funcionarioNome ? `Olá, ${funcionarioNome}! ` : ""}Posicione seu rosto no círculo`;
-      case "face-detected":
-        return "Centralize seu rosto no círculo";
-      case "face-centered":
-        return solicitarSorriso
-          ? "Rosto OK! Agora sorria 😊"
-          : "Mantenha a posição...";
-      case "waiting-smile":
-        return "Sorria! 😊";
-      case "smile-detected":
-        return "Sorriso perfeito! Mantenha...";
+      case "waiting-face":
+        return `${funcionarioNome ? `Olá, ${funcionarioNome}!\n` : ""}Mostre seu rosto para a câmera`;
+      case "face-ok":
+        return "Rosto detectado! Preparando desafios...";
+      case "challenge-1":
+        return `${getChallengeDisplayName(challenge1Ref.current)}\n(${timeRemaining}s)`;
+      case "challenge-1-ok":
+        return "Desafio 1 completo! ✅";
+      case "challenge-2":
+        return `${getChallengeDisplayName(challenge2Ref.current)}\n(${timeRemaining}s)`;
+      case "challenge-2-ok":
+        return "Desafio 2 completo! ✅";
+      case "challenge-3":
+        return `${getChallengeDisplayName(challenge3Ref.current)}\n(${timeRemaining}s)`;
+      case "challenge-3-ok":
+        return "Todos os desafios completos! ✅";
+      case "ready-to-capture":
+        return "Pronto! Capturando...";
       case "capturing":
-        return "Capturando...";
+        return "Capturando foto...";
       case "analyzing":
         return "Analisando...";
       case "success":
-        return "Perfeito! ✨";
+        return "Verificação concluída! ✨";
       case "error":
         return errorMessage;
       default:
-        return "Posicione seu rosto";
+        return "Aguarde...";
     }
   };
 
-  const activeDevice = useCameraDevice("front");
+  const activeDevice = useCameraDevice(cameraType);
 
   if (hasPermission == null) {
     return (
@@ -411,9 +595,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
     return (
       <View style={styles.noPermissionContainer}>
         <Ionicons name="videocam-off" size={64} color={colors.muted.light} />
-        <Text style={styles.noPermissionText}>
-          Sem permissão para acessar a câmera
-        </Text>
+        <Text style={styles.noPermissionText}>Sem permissão para câmera</Text>
         <TouchableOpacity style={styles.button} onPress={requestPermission}>
           <Text style={styles.buttonText}>Solicitar Permissão</Text>
         </TouchableOpacity>
@@ -449,7 +631,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         photo={true}
       />
 
-      {/* Preview da foto */}
       {capturedPhoto && (status === "analyzing" || status === "success") && (
         <Image
           source={{ uri: capturedPhoto }}
@@ -457,9 +638,8 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         />
       )}
 
-      {/* Overlay */}
+      {/* ✅ SEM CÍRCULO - Apenas overlay com instruções */}
       <View style={styles.overlay}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
             <Ionicons name="close" size={28} color="#ffffff" />
@@ -468,79 +648,13 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
           <View style={{ width: 44 }} />
         </View>
 
-        {/* Oval */}
-        <View style={styles.centerContainer}>
-          <Animated.View
-            style={[
-              styles.ovalContainer,
-              {
-                transform: [
-                  {
-                    scale:
-                      status === "face-centered" || status === "smile-detected"
-                        ? 1
-                        : status === "success"
-                          ? scaleAnim
-                          : pulseAnim,
-                  },
-                ],
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.oval,
-                {
-                  borderColor: getOvalColor(),
-                  borderWidth: 3,
-                },
-              ]}
-            >
-              {/* Cantos */}
-              <View
-                style={[
-                  styles.corner,
-                  styles.cornerTopLeft,
-                  { borderColor: getOvalColor() },
-                ]}
-              />
-              <View
-                style={[
-                  styles.corner,
-                  styles.cornerTopRight,
-                  { borderColor: getOvalColor() },
-                ]}
-              />
-              <View
-                style={[
-                  styles.corner,
-                  styles.cornerBottomLeft,
-                  { borderColor: getOvalColor() },
-                ]}
-              />
-              <View
-                style={[
-                  styles.corner,
-                  styles.cornerBottomRight,
-                  { borderColor: getOvalColor() },
-                ]}
-              />
-            </View>
-          </Animated.View>
-        </View>
+        {/* Espaço vazio no meio - sem círculo */}
+        <View style={styles.centerContainer} />
 
-        {/* Bottom */}
         <View style={styles.bottomContainer}>
-          {countdown > 0 && (
-            <View style={styles.countdownBadge}>
-              <Text style={styles.countdownText}>{countdown}</Text>
-            </View>
-          )}
-
           {status === "analyzing" && (
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color="#ffffff" />
           )}
-
           {status === "success" && (
             <Ionicons
               name="checkmark-circle"
@@ -549,61 +663,110 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
             />
           )}
 
+          {timeRemaining > 0 &&
+            (status === "challenge-1" ||
+              status === "challenge-2" ||
+              status === "challenge-3") && (
+              <View style={styles.timerBadge}>
+                <Text style={styles.timerText}>{timeRemaining}</Text>
+              </View>
+            )}
+
           <View style={styles.instructionBox}>
             <Text style={styles.instructionText}>{getInstructionText()}</Text>
           </View>
 
-          {/* Indicadores */}
-          <View style={styles.statusContainer}>
-            <View style={styles.statusItem}>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressStep}>
               <View
                 style={[
-                  styles.statusDot,
+                  styles.progressDot,
                   {
                     backgroundColor:
-                      status !== "positioning"
+                      status !== "waiting-face"
                         ? colors.success
                         : colors.muted.light,
                   },
                 ]}
               />
-              <Text style={styles.statusText}>Rosto</Text>
+              <Text style={styles.progressText}>Rosto</Text>
             </View>
-
-            <View style={styles.statusItem}>
+            <View style={styles.progressStep}>
               <View
                 style={[
-                  styles.statusDot,
+                  styles.progressDot,
                   {
                     backgroundColor:
-                      status === "face-centered" ||
-                      status === "waiting-smile" ||
-                      status === "smile-detected" ||
-                      status === "countdown"
+                      status === "challenge-1-ok" ||
+                      status === "challenge-2" ||
+                      status === "challenge-2-ok" ||
+                      status === "challenge-3" ||
+                      status === "challenge-3-ok" ||
+                      status === "ready-to-capture" ||
+                      status === "capturing" ||
+                      status === "analyzing" ||
+                      status === "success"
                         ? colors.success
                         : colors.muted.light,
                   },
                 ]}
               />
-              <Text style={styles.statusText}>Posição</Text>
+              <Text style={styles.progressText}>1</Text>
             </View>
-
-            {solicitarSorriso && (
-              <View style={styles.statusItem}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor:
-                        status === "smile-detected" || status === "countdown"
-                          ? colors.success
-                          : colors.muted.light,
-                    },
-                  ]}
-                />
-                <Text style={styles.statusText}>Sorriso</Text>
-              </View>
-            )}
+            <View style={styles.progressStep}>
+              <View
+                style={[
+                  styles.progressDot,
+                  {
+                    backgroundColor:
+                      status === "challenge-2-ok" ||
+                      status === "challenge-3" ||
+                      status === "challenge-3-ok" ||
+                      status === "ready-to-capture" ||
+                      status === "capturing" ||
+                      status === "analyzing" ||
+                      status === "success"
+                        ? colors.success
+                        : colors.muted.light,
+                  },
+                ]}
+              />
+              <Text style={styles.progressText}>2</Text>
+            </View>
+            <View style={styles.progressStep}>
+              <View
+                style={[
+                  styles.progressDot,
+                  {
+                    backgroundColor:
+                      status === "challenge-3-ok" ||
+                      status === "ready-to-capture" ||
+                      status === "capturing" ||
+                      status === "analyzing" ||
+                      status === "success"
+                        ? colors.success
+                        : colors.muted.light,
+                  },
+                ]}
+              />
+              <Text style={styles.progressText}>3</Text>
+            </View>
+            <View style={styles.progressStep}>
+              <View
+                style={[
+                  styles.progressDot,
+                  {
+                    backgroundColor:
+                      status === "capturing" ||
+                      status === "analyzing" ||
+                      status === "success"
+                        ? colors.success
+                        : colors.muted.light,
+                  },
+                ]}
+              />
+              <Text style={styles.progressText}>Foto</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -612,10 +775,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000000",
-  },
+  container: { flex: 1, backgroundColor: "#000000" },
   loadingContainer: {
     flex: 1,
     alignItems: "center",
@@ -623,14 +783,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000",
     gap: 16,
   },
-  loadingText: {
-    color: "#ffffff",
-    fontSize: 16,
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
-  },
+  loadingText: { color: "#ffffff", fontSize: 16 },
+  overlay: { flex: 1 },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -638,124 +792,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   closeButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
-  title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#ffffff",
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ovalContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  oval: {
-    width: OVAL_WIDTH,
-    height: OVAL_HEIGHT,
-    borderRadius: OVAL_WIDTH / 2,
-    position: "relative",
-  },
-  corner: {
-    position: "absolute",
-    width: 30,
-    height: 30,
-  },
-  cornerTopLeft: {
-    top: -2,
-    left: -2,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 8,
-  },
-  cornerTopRight: {
-    top: -2,
-    right: -2,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 8,
-  },
-  cornerBottomLeft: {
-    bottom: -2,
-    left: -2,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 8,
-  },
-  cornerBottomRight: {
-    bottom: -2,
-    right: -2,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 8,
-  },
+  title: { fontSize: 18, fontWeight: "bold", color: "#ffffff" },
+  centerContainer: { flex: 1 },
   bottomContainer: {
     paddingBottom: 48,
     paddingHorizontal: 24,
     alignItems: "center",
     gap: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingTop: 24,
   },
-  countdownBadge: {
+  timerBadge: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.primary,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
   },
-  countdownText: {
-    fontSize: 36,
-    fontWeight: "bold",
-    color: "#ffffff",
-  },
+  timerText: { fontSize: 36, fontWeight: "bold", color: "#ffffff" },
   instructionBox: {
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    paddingHorizontal: 32,
+    paddingVertical: 20,
+    borderRadius: 16,
     maxWidth: "90%",
     alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255, 255, 255, 0.2)",
   },
   instructionText: {
     color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
     textAlign: "center",
+    lineHeight: 26,
   },
-  statusContainer: {
-    flexDirection: "row",
-    gap: 24,
-  },
-  statusItem: {
-    alignItems: "center",
-    gap: 6,
-  },
-  statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "500",
-  },
+  progressContainer: { flexDirection: "row", gap: 16 },
+  progressStep: { alignItems: "center", gap: 6 },
+  progressDot: { width: 12, height: 12, borderRadius: 6 },
+  progressText: { color: "#ffffff", fontSize: 11, fontWeight: "500" },
   noPermissionContainer: {
     flex: 1,
     alignItems: "center",
@@ -775,12 +866,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
   },
-  buttonSecondary: {
-    backgroundColor: colors.muted.light,
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+  buttonSecondary: { backgroundColor: colors.muted.light },
+  buttonText: { color: "#ffffff", fontSize: 16, fontWeight: "600" },
 });

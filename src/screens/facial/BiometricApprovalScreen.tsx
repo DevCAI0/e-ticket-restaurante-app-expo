@@ -270,6 +270,7 @@ export const BiometricApprovalScreen: React.FC = () => {
 
       {step === "camera" && (
         <FacialCamera
+          cameraType={cameraType} 
           onCapture={handleCapture}
           onCancel={handleCancel}
           funcionarioNome={user?.nome}
