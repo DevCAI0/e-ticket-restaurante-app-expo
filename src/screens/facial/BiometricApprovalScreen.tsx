@@ -16,7 +16,7 @@ import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { FacialCamera } from "../facial/components/FacialCamera";
 import { FacialResult } from "./components/FacialResult";
-import { facialRecognitionService } from "../../services/facialRecognitionService";
+import { useFacialRecognition } from "../../hooks/useFacialRecognition";
 import { useAuth } from "../../hooks/useAuth";
 import { showErrorToast } from "../../lib/toast";
 
@@ -35,6 +35,8 @@ interface VerificationResult {
 export const BiometricApprovalScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
+  const { verificarIdentidade, isVerifying } = useFacialRecognition();
+
   const [step, setStep] = useState<Step>("intro");
   const [cameraType, setCameraType] = useState<"front" | "back">("front");
   const [result, setResult] = useState<VerificationResult | null>(null);
@@ -45,66 +47,24 @@ export const BiometricApprovalScreen: React.FC = () => {
   };
 
   const handleCapture = async (imageUri: string) => {
-    setStep("processing");
-
     if (!user?.id_restaurante) {
       showErrorToast("Restaurante não identificado");
       setStep("intro");
       return;
     }
 
+    setStep("processing");
+
     try {
-      // Converter imagem para base64
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      const reader = new FileReader();
+      const verificationResult = await verificarIdentidade(
+        imageUri,
+        user.id_restaurante
+      );
 
-      reader.onloadend = async () => {
-        const base64data = reader.result as string;
-
-        try {
-          const verificationResult =
-            await facialRecognitionService.verificarRosto({
-              restaurante_id: user.id_restaurante!,
-              imagem_base64: base64data,
-            });
-
-          if (verificationResult.success && verificationResult.data) {
-            setResult({
-              success: true,
-              message: "Identidade confirmada com sucesso!",
-              capturedImage: imageUri,
-              referenceImage: verificationResult.data.foto_referencia,
-              funcionarioNome: verificationResult.data.nome,
-              similaridade: verificationResult.data.similaridade,
-              tempoProcessamento: verificationResult.data.tempo_processamento,
-            });
-          } else {
-            setResult({
-              success: false,
-              message:
-                verificationResult.message ||
-                "Não foi possível verificar sua identidade",
-              capturedImage: imageUri,
-            });
-          }
-
-          setStep("result");
-        } catch (error) {
-          console.error("Erro ao verificar rosto:", error);
-          setResult({
-            success: false,
-            message: "Erro ao processar verificação facial",
-            capturedImage: imageUri,
-          });
-          setStep("result");
-        }
-      };
-
-      reader.readAsDataURL(blob);
+      setResult(verificationResult);
+      setStep("result");
     } catch (error) {
-      console.error("Erro ao processar imagem:", error);
-      showErrorToast("Erro ao processar imagem");
+      console.error("Erro:", error);
       setStep("intro");
     }
   };
@@ -180,9 +140,9 @@ export const BiometricApprovalScreen: React.FC = () => {
               <Ionicons name="happy" size={24} color={colors.primary} />
             </View>
             <View style={styles.instructionText}>
-              <Text style={styles.instructionStep}>3. Sorria</Text>
+              <Text style={styles.instructionStep}>3. Complete desafios</Text>
               <Text style={styles.instructionDescription}>
-                Aguarde enquanto capturamos sua foto
+                Vire o rosto e pisque/sorria quando solicitado
               </Text>
             </View>
           </View>
@@ -247,6 +207,11 @@ export const BiometricApprovalScreen: React.FC = () => {
         <Text style={styles.processingSubtitle}>
           Analisando sua foto e comparando com nosso banco de dados
         </Text>
+        {isVerifying && (
+          <Text style={styles.processingHint}>
+            Isso pode levar alguns segundos...
+          </Text>
+        )}
       </Card>
     </View>
   );
@@ -270,7 +235,7 @@ export const BiometricApprovalScreen: React.FC = () => {
 
       {step === "camera" && (
         <FacialCamera
-          cameraType={cameraType} 
+          cameraType={cameraType}
           onCapture={handleCapture}
           onCancel={handleCancel}
           funcionarioNome={user?.nome}
@@ -442,5 +407,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted.light,
     textAlign: "center",
+  },
+  processingHint: {
+    fontSize: 12,
+    color: colors.muted.light,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

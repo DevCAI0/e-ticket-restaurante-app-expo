@@ -1,5 +1,5 @@
 // src/screens/facial/components/FacialCamera.tsx
-// SEM CÍRCULO - DETECÇÃO LIVRE COM DESAFIOS DE VIVACIDADE
+// COM CÍRCULO OVAL - Aparece após desafios de virar
 
 import React, { useRef, useState, useEffect } from "react";
 import {
@@ -37,12 +37,11 @@ type LivenessChallenge = "blink" | "turn-left" | "turn-right" | "smile";
 type CaptureStatus =
   | "waiting-face"
   | "face-ok"
-  | "challenge-1"
-  | "challenge-1-ok"
-  | "challenge-2"
-  | "challenge-2-ok"
-  | "challenge-3"
-  | "challenge-3-ok"
+  | "challenge-turn"
+  | "turn-ok"
+  | "show-oval"
+  | "challenge-final"
+  | "final-ok"
   | "ready-to-capture"
   | "capturing"
   | "analyzing"
@@ -64,11 +63,11 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   const [errorMessage, setErrorMessage] = useState("");
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(0);
+  const [showOval, setShowOval] = useState(false);
 
-  // ✅ 3 DESAFIOS: VIRAR, PISCAR, SORRIR
-  const challenge1Ref = useRef<LivenessChallenge | null>(null);
-  const challenge2Ref = useRef<LivenessChallenge | null>(null);
-  const challenge3Ref = useRef<LivenessChallenge | null>(null);
+  // Desafios: primeiro virar, depois piscar/sorrir
+  const turnChallengeRef = useRef<"turn-left" | "turn-right">("turn-left");
+  const finalChallengeRef = useRef<"blink" | "smile">("blink");
 
   // Estados para detecção
   const prevYawRef = useRef<number>(0);
@@ -77,6 +76,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   const turnDetectedRef = useRef<boolean>(false);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
+  const ovalScaleAnim = useRef(new Animated.Value(0)).current;
 
   const validationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const stepTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -86,21 +86,14 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   }, []);
 
   const generateRandomChallenges = () => {
-    // ✅ EMBARALHA OS 3 DESAFIOS
-    const availableChallenges: LivenessChallenge[] = [
-      "blink",
-      "turn-left",
-      "turn-right",
-      "smile",
-    ];
+    // Escolhe aleatoriamente: virar esquerda ou direita
+    turnChallengeRef.current = Math.random() > 0.5 ? "turn-left" : "turn-right";
 
-    const shuffled = availableChallenges.sort(() => Math.random() - 0.5);
-    challenge1Ref.current = shuffled[0];
-    challenge2Ref.current = shuffled[1];
-    challenge3Ref.current = shuffled[2];
+    // Escolhe aleatoriamente: piscar ou sorrir
+    finalChallengeRef.current = Math.random() > 0.5 ? "blink" : "smile";
 
     console.log(
-      `🎲 Desafios: 1=${challenge1Ref.current} 2=${challenge2Ref.current} 3=${challenge3Ref.current}`
+      `🎲 Desafios: 1=${turnChallengeRef.current} | 2=${finalChallengeRef.current}`
     );
   };
 
@@ -114,15 +107,14 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
     const activeStates: CaptureStatus[] = [
       "waiting-face",
       "face-ok",
-      "challenge-1",
-      "challenge-2",
-      "challenge-3",
+      "challenge-turn",
+      "challenge-final",
     ];
 
     if (activeStates.includes(status)) {
       validationIntervalRef.current = setInterval(() => {
         validateFrame();
-      }, 600); // Mais rápido para virar
+      }, 600);
 
       return () => {
         if (validationIntervalRef.current) {
@@ -150,9 +142,9 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 
     const skipStates: CaptureStatus[] = [
       "error",
-      "challenge-1-ok",
-      "challenge-2-ok",
-      "challenge-3-ok",
+      "turn-ok",
+      "show-oval",
+      "final-ok",
       "ready-to-capture",
       "capturing",
       "analyzing",
@@ -179,36 +171,22 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 
       const result = await FaceDetector.detectFacesAsync(imageUri, options);
 
-      // SEM ROSTO - Mais tolerante, não reseta imediatamente
+      // SEM ROSTO - Mais tolerante durante desafios
       if (result.faces.length === 0) {
-        // Ignora perda temporária durante piscar ou virar
+        const isTurning = status === "challenge-turn";
         const isBlinking =
-          (status === "challenge-1" && challenge1Ref.current === "blink") ||
-          (status === "challenge-2" && challenge2Ref.current === "blink") ||
-          (status === "challenge-3" && challenge3Ref.current === "blink");
+          status === "challenge-final" && finalChallengeRef.current === "blink";
 
-        const isTurning =
-          (status === "challenge-1" &&
-            (challenge1Ref.current === "turn-left" ||
-              challenge1Ref.current === "turn-right")) ||
-          (status === "challenge-2" &&
-            (challenge2Ref.current === "turn-left" ||
-              challenge2Ref.current === "turn-right")) ||
-          (status === "challenge-3" &&
-            (challenge3Ref.current === "turn-left" ||
-              challenge3Ref.current === "turn-right"));
-
-        if (isBlinking || isTurning) {
+        if (isTurning || isBlinking) {
           console.log("⏸️ Perda temporária de rosto - ignorando");
           return;
         }
 
-        // Só dá erro se estiver esperando rosto inicial
         if (status === "waiting-face") {
           return; // Aguarda rosto aparecer
         }
 
-        return; // Mais tolerante em geral
+        return;
       }
 
       // MÚLTIPLOS ROSTOS
@@ -235,89 +213,51 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         setStatus("face-ok");
 
         stepTimerRef.current = setTimeout(() => {
-          console.log(`➡️ STEP 2: Desafio 1 = ${challenge1Ref.current}`);
-          setStatus("challenge-1");
+          console.log(`➡️ STEP 2: Desafio virar = ${turnChallengeRef.current}`);
+          setStatus("challenge-turn");
           resetChallengeState();
           startCountdown(12);
         }, 2000);
-      } else if (status === "challenge-1") {
-        const completed = checkChallengeCompletion(
-          challenge1Ref.current!,
-          leftEyeOpen,
-          rightEyeOpen,
-          smilingProbability,
-          yawAngle
-        );
+      } else if (status === "challenge-turn") {
+        const completed = checkTurnChallenge(yawAngle);
 
         if (completed) {
-          console.log(`✅ Desafio 1 (${challenge1Ref.current}) COMPLETO!`);
+          console.log(
+            `✅ Desafio virar (${turnChallengeRef.current}) COMPLETO!`
+          );
 
-          // ✅ LIMPA O COUNTDOWN IMEDIATAMENTE!
           if (stepTimerRef.current) {
             clearInterval(stepTimerRef.current);
             clearTimeout(stepTimerRef.current);
             stepTimerRef.current = null;
           }
 
-          setStatus("challenge-1-ok");
+          setStatus("turn-ok");
           setTimeRemaining(0);
 
           stepTimerRef.current = setTimeout(() => {
-            console.log(`➡️ STEP 3: Desafio 2 = ${challenge2Ref.current}`);
-            setStatus("challenge-2");
-            resetChallengeState();
-            startCountdown(12);
+            showOvalCircle();
           }, 1000);
         }
-      } else if (status === "challenge-2") {
-        const completed = checkChallengeCompletion(
-          challenge2Ref.current!,
+      } else if (status === "challenge-final") {
+        const completed = checkFinalChallenge(
           leftEyeOpen,
           rightEyeOpen,
-          smilingProbability,
-          yawAngle
+          smilingProbability
         );
 
         if (completed) {
-          console.log(`✅ Desafio 2 (${challenge2Ref.current}) COMPLETO!`);
+          console.log(
+            `✅ Desafio final (${finalChallengeRef.current}) COMPLETO!`
+          );
 
-          // ✅ LIMPA O COUNTDOWN IMEDIATAMENTE!
           if (stepTimerRef.current) {
             clearInterval(stepTimerRef.current);
             clearTimeout(stepTimerRef.current);
             stepTimerRef.current = null;
           }
 
-          setStatus("challenge-2-ok");
-          setTimeRemaining(0);
-
-          stepTimerRef.current = setTimeout(() => {
-            console.log(`➡️ STEP 4: Desafio 3 = ${challenge3Ref.current}`);
-            setStatus("challenge-3");
-            resetChallengeState();
-            startCountdown(12);
-          }, 1000);
-        }
-      } else if (status === "challenge-3") {
-        const completed = checkChallengeCompletion(
-          challenge3Ref.current!,
-          leftEyeOpen,
-          rightEyeOpen,
-          smilingProbability,
-          yawAngle
-        );
-
-        if (completed) {
-          console.log(`✅ Desafio 3 (${challenge3Ref.current}) COMPLETO!`);
-
-          // ✅ LIMPA O COUNTDOWN IMEDIATAMENTE!
-          if (stepTimerRef.current) {
-            clearInterval(stepTimerRef.current);
-            clearTimeout(stepTimerRef.current);
-            stepTimerRef.current = null;
-          }
-
-          setStatus("challenge-3-ok");
+          setStatus("final-ok");
           setTimeRemaining(0);
 
           stepTimerRef.current = setTimeout(() => {
@@ -330,83 +270,103 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
     }
   };
 
-  const checkChallengeCompletion = (
-    challenge: LivenessChallenge,
-    leftEyeOpen: number,
-    rightEyeOpen: number,
-    smilingProbability: number,
-    yawAngle: number
-  ): boolean => {
-    switch (challenge) {
-      case "blink":
-        const leftChange = Math.abs(leftEyeOpen - prevLeftEyeRef.current);
-        const rightChange = Math.abs(rightEyeOpen - prevRightEyeRef.current);
-        const totalChange = leftChange + rightChange;
+  const checkTurnChallenge = (yawAngle: number): boolean => {
+    const challenge = turnChallengeRef.current;
 
-        prevLeftEyeRef.current = leftEyeOpen;
-        prevRightEyeRef.current = rightEyeOpen;
+    if (challenge === "turn-left") {
+      // Detecta virada para esquerda
+      if (yawAngle < -15 && !turnDetectedRef.current) {
+        console.log(`👈 Virou ESQUERDA! (${yawAngle.toFixed(1)}°)`);
+        turnDetectedRef.current = true;
+        prevYawRef.current = yawAngle;
+        return false;
+      }
 
-        if (totalChange > 0.8) {
-          console.log(
-            `👁️ PISCADA! Variação: ${Math.round(totalChange * 100)}%`
-          );
-          return true;
-        }
-        break;
+      // Detecta retorno
+      if (turnDetectedRef.current && yawAngle > prevYawRef.current + 8) {
+        console.log(
+          `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
+        );
+        return true;
+      }
 
-      case "turn-left":
-        // Detecta virada para esquerda
-        if (yawAngle < -15 && !turnDetectedRef.current) {
-          console.log(`👈 Virou ESQUERDA! (${yawAngle.toFixed(1)}°)`);
-          turnDetectedRef.current = true;
-          prevYawRef.current = yawAngle;
-          return false;
-        }
+      if (turnDetectedRef.current && yawAngle < prevYawRef.current) {
+        prevYawRef.current = yawAngle;
+      }
+    } else {
+      // turn-right
+      // Detecta virada para direita
+      if (yawAngle > 15 && !turnDetectedRef.current) {
+        console.log(`👉 Virou DIREITA! (${yawAngle.toFixed(1)}°)`);
+        turnDetectedRef.current = true;
+        prevYawRef.current = yawAngle;
+        return false;
+      }
 
-        // Detecta retorno
-        if (turnDetectedRef.current && yawAngle > prevYawRef.current + 8) {
-          console.log(
-            `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
-          );
-          return true;
-        }
+      // Detecta retorno
+      if (turnDetectedRef.current && yawAngle < prevYawRef.current - 8) {
+        console.log(
+          `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
+        );
+        return true;
+      }
 
-        if (turnDetectedRef.current && yawAngle < prevYawRef.current) {
-          prevYawRef.current = yawAngle;
-        }
-        break;
-
-      case "turn-right":
-        // Detecta virada para direita
-        if (yawAngle > 15 && !turnDetectedRef.current) {
-          console.log(`👉 Virou DIREITA! (${yawAngle.toFixed(1)}°)`);
-          turnDetectedRef.current = true;
-          prevYawRef.current = yawAngle;
-          return false;
-        }
-
-        // Detecta retorno
-        if (turnDetectedRef.current && yawAngle < prevYawRef.current - 8) {
-          console.log(
-            `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
-          );
-          return true;
-        }
-
-        if (turnDetectedRef.current && yawAngle > prevYawRef.current) {
-          prevYawRef.current = yawAngle;
-        }
-        break;
-
-      case "smile":
-        if (smilingProbability >= 0.5) {
-          console.log(`😊 Sorriso! (${Math.round(smilingProbability * 100)}%)`);
-          return true;
-        }
-        break;
+      if (turnDetectedRef.current && yawAngle > prevYawRef.current) {
+        prevYawRef.current = yawAngle;
+      }
     }
 
     return false;
+  };
+
+  const checkFinalChallenge = (
+    leftEyeOpen: number,
+    rightEyeOpen: number,
+    smilingProbability: number
+  ): boolean => {
+    const challenge = finalChallengeRef.current;
+
+    if (challenge === "blink") {
+      const leftChange = Math.abs(leftEyeOpen - prevLeftEyeRef.current);
+      const rightChange = Math.abs(rightEyeOpen - prevRightEyeRef.current);
+      const totalChange = leftChange + rightChange;
+
+      prevLeftEyeRef.current = leftEyeOpen;
+      prevRightEyeRef.current = rightEyeOpen;
+
+      if (totalChange > 0.8) {
+        console.log(`👁️ PISCADA! Variação: ${Math.round(totalChange * 100)}%`);
+        return true;
+      }
+    } else if (challenge === "smile") {
+      if (smilingProbability >= 0.5) {
+        console.log(`😊 Sorriso! (${Math.round(smilingProbability * 100)}%)`);
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const showOvalCircle = () => {
+    console.log("🔵 STEP 3: Mostrando círculo oval...");
+    setStatus("show-oval");
+    setShowOval(true);
+
+    // Animação do círculo aparecendo
+    Animated.spring(ovalScaleAnim, {
+      toValue: 1,
+      tension: 50,
+      friction: 7,
+      useNativeDriver: true,
+    }).start();
+
+    stepTimerRef.current = setTimeout(() => {
+      console.log(`➡️ STEP 4: Desafio final = ${finalChallengeRef.current}`);
+      setStatus("challenge-final");
+      resetChallengeState();
+      startCountdown(12);
+    }, 2000);
   };
 
   const resetChallengeState = () => {
@@ -417,7 +377,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   };
 
   const startCountdown = (seconds: number) => {
-    // ✅ LIMPA countdown anterior antes de criar novo
     if (stepTimerRef.current) {
       clearTimeout(stepTimerRef.current);
       stepTimerRef.current = null;
@@ -439,7 +398,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
       });
     }, 1000);
 
-    // ✅ SALVA referência do countdown para poder limpar
     stepTimerRef.current = countdown as any;
   };
 
@@ -525,26 +483,11 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
     setTimeRemaining(0);
     setCapturedPhoto(null);
     setErrorMessage("");
+    setShowOval(false);
+    ovalScaleAnim.setValue(0);
     resetChallengeState();
     if (stepTimerRef.current) clearTimeout(stepTimerRef.current);
     generateRandomChallenges();
-  };
-
-  const getChallengeDisplayName = (
-    challenge: LivenessChallenge | null
-  ): string => {
-    switch (challenge) {
-      case "blink":
-        return "👁️ PISQUE os olhos";
-      case "turn-left":
-        return "👈 Vire o rosto para ESQUERDA";
-      case "turn-right":
-        return "👉 Vire o rosto para DIREITA";
-      case "smile":
-        return "😊 SORRIA";
-      default:
-        return "Aguarde...";
-    }
   };
 
   const getInstructionText = () => {
@@ -552,19 +495,25 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
       case "waiting-face":
         return `${funcionarioNome ? `Olá, ${funcionarioNome}!\n` : ""}Mostre seu rosto para a câmera`;
       case "face-ok":
-        return "Rosto detectado! Preparando desafios...";
-      case "challenge-1":
-        return `${getChallengeDisplayName(challenge1Ref.current)}\n(${timeRemaining}s)`;
-      case "challenge-1-ok":
-        return "Desafio 1 completo! ✅";
-      case "challenge-2":
-        return `${getChallengeDisplayName(challenge2Ref.current)}\n(${timeRemaining}s)`;
-      case "challenge-2-ok":
-        return "Desafio 2 completo! ✅";
-      case "challenge-3":
-        return `${getChallengeDisplayName(challenge3Ref.current)}\n(${timeRemaining}s)`;
-      case "challenge-3-ok":
-        return "Todos os desafios completos! ✅";
+        return "Rosto detectado! Preparando desafio...";
+      case "challenge-turn":
+        const turnText =
+          turnChallengeRef.current === "turn-left"
+            ? "👈 Vire o rosto para ESQUERDA"
+            : "👉 Vire o rosto para DIREITA";
+        return `${turnText}\n(${timeRemaining}s)`;
+      case "turn-ok":
+        return "Desafio completo! ✅";
+      case "show-oval":
+        return "Posicione seu rosto no círculo";
+      case "challenge-final":
+        const finalText =
+          finalChallengeRef.current === "blink"
+            ? "👁️ PISQUE os olhos"
+            : "😊 SORRIA";
+        return `${finalText}\n(${timeRemaining}s)`;
+      case "final-ok":
+        return "Perfeito! ✅";
       case "ready-to-capture":
         return "Pronto! Capturando...";
       case "capturing":
@@ -638,7 +587,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         />
       )}
 
-      {/* ✅ SEM CÍRCULO - Apenas overlay com instruções */}
       <View style={styles.overlay}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
@@ -648,8 +596,21 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
           <View style={{ width: 44 }} />
         </View>
 
-        {/* Espaço vazio no meio - sem círculo */}
-        <View style={styles.centerContainer} />
+        {/* CÍRCULO OVAL - Aparece após virar */}
+        <View style={styles.centerContainer}>
+          {showOval && (
+            <Animated.View
+              style={[
+                styles.ovalContainer,
+                {
+                  transform: [{ scale: ovalScaleAnim }],
+                },
+              ]}
+            >
+              <View style={styles.oval} />
+            </Animated.View>
+          )}
+        </View>
 
         <View style={styles.bottomContainer}>
           {status === "analyzing" && (
@@ -664,9 +625,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
           )}
 
           {timeRemaining > 0 &&
-            (status === "challenge-1" ||
-              status === "challenge-2" ||
-              status === "challenge-3") && (
+            (status === "challenge-turn" || status === "challenge-final") && (
               <View style={styles.timerBadge}>
                 <Text style={styles.timerText}>{timeRemaining}</Text>
               </View>
@@ -697,11 +656,10 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
                   styles.progressDot,
                   {
                     backgroundColor:
-                      status === "challenge-1-ok" ||
-                      status === "challenge-2" ||
-                      status === "challenge-2-ok" ||
-                      status === "challenge-3" ||
-                      status === "challenge-3-ok" ||
+                      status === "turn-ok" ||
+                      status === "show-oval" ||
+                      status === "challenge-final" ||
+                      status === "final-ok" ||
                       status === "ready-to-capture" ||
                       status === "capturing" ||
                       status === "analyzing" ||
@@ -711,7 +669,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
                   },
                 ]}
               />
-              <Text style={styles.progressText}>1</Text>
+              <Text style={styles.progressText}>Virar</Text>
             </View>
             <View style={styles.progressStep}>
               <View
@@ -719,9 +677,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
                   styles.progressDot,
                   {
                     backgroundColor:
-                      status === "challenge-2-ok" ||
-                      status === "challenge-3" ||
-                      status === "challenge-3-ok" ||
+                      status === "final-ok" ||
                       status === "ready-to-capture" ||
                       status === "capturing" ||
                       status === "analyzing" ||
@@ -731,25 +687,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
                   },
                 ]}
               />
-              <Text style={styles.progressText}>2</Text>
-            </View>
-            <View style={styles.progressStep}>
-              <View
-                style={[
-                  styles.progressDot,
-                  {
-                    backgroundColor:
-                      status === "challenge-3-ok" ||
-                      status === "ready-to-capture" ||
-                      status === "capturing" ||
-                      status === "analyzing" ||
-                      status === "success"
-                        ? colors.success
-                        : colors.muted.light,
-                  },
-                ]}
-              />
-              <Text style={styles.progressText}>3</Text>
+              <Text style={styles.progressText}>Círculo</Text>
             </View>
             <View style={styles.progressStep}>
               <View
@@ -803,7 +741,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: { fontSize: 18, fontWeight: "bold", color: "#ffffff" },
-  centerContainer: { flex: 1 },
+  centerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ovalContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  oval: {
+    width: width * 0.7,
+    height: height * 0.5,
+    borderRadius: (width * 0.7) / 2,
+    borderWidth: 4,
+    borderColor: "#4A90E2",
+    backgroundColor: "transparent",
+    shadowColor: "#4A90E2",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 10,
+  },
   bottomContainer: {
     paddingBottom: 48,
     paddingHorizontal: 24,
