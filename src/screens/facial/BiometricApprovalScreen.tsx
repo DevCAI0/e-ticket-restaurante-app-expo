@@ -16,11 +16,18 @@ import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { FacialCamera } from "../facial/components/FacialCamera";
 import { FacialResult } from "./components/FacialResult";
+import { LiberacoesLista } from "./components/LiberacoesLista";
 import { useFacialRecognition } from "../../hooks/useFacialRecognition";
 import { useAuth } from "../../hooks/useAuth";
-import { showErrorToast } from "../../lib/toast";
+import { showErrorToast, showSuccessToast } from "../../lib/toast";
 
-type Step = "intro" | "camera" | "processing" | "result";
+type Step =
+  | "intro"
+  | "camera"
+  | "processing"
+  | "liberacoes"
+  | "consuming"
+  | "result";
 
 interface VerificationResult {
   success: boolean;
@@ -30,16 +37,35 @@ interface VerificationResult {
   funcionarioNome?: string;
   similaridade?: number;
   tempoProcessamento?: number;
+  funcionario?: {
+    id: number;
+    nome: string;
+    cpf: string;
+    foto_referencia?: string;
+  };
+  liberacoes_disponiveis?: Array<{
+    id: number;
+    data: string;
+    data_formatada: string;
+    tipo_refeicao: {
+      id: number;
+      nome: string;
+    };
+  }>;
+  total_liberacoes?: number;
 }
 
 export const BiometricApprovalScreen: React.FC = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
-  const { verificarIdentidade, isVerifying } = useFacialRecognition();
+  const { verificarIdentidade, consumirLiberacao, isVerifying, isConsuming } =
+    useFacialRecognition();
 
   const [step, setStep] = useState<Step>("intro");
   const [cameraType, setCameraType] = useState<"front" | "back">("front");
   const [result, setResult] = useState<VerificationResult | null>(null);
+  const [consumingId, setConsumingId] = useState<number | undefined>();
+  const [ticketGerado, setTicketGerado] = useState<any>(null);
 
   const handleStartCamera = (type: "front" | "back") => {
     setCameraType(type);
@@ -62,10 +88,55 @@ export const BiometricApprovalScreen: React.FC = () => {
       );
 
       setResult(verificationResult);
-      setStep("result");
+
+      if (
+        verificationResult.success &&
+        verificationResult.total_liberacoes &&
+        verificationResult.total_liberacoes > 0
+      ) {
+        setStep("liberacoes");
+      } else {
+        setStep("result");
+      }
     } catch (error) {
       console.error("Erro:", error);
       setStep("intro");
+    }
+  };
+
+  const handleConsumirLiberacao = async (liberacaoId: number) => {
+    if (!user?.id_restaurante || !user?.id_estabelecimento) {
+      showErrorToast("Dados do restaurante não encontrados");
+      return;
+    }
+
+    setConsumingId(liberacaoId);
+    setStep("consuming");
+
+    try {
+      const consumoResult = await consumirLiberacao(
+        liberacaoId,
+        user.id_restaurante,
+        user.id_estabelecimento
+      );
+
+      if (consumoResult.success && consumoResult.ticket) {
+        setTicketGerado(consumoResult.ticket);
+        showSuccessToast("Ticket gerado com sucesso!");
+
+        // Aguardar um momento antes de voltar
+        setTimeout(() => {
+          navigation.goBack();
+        }, 2000);
+      } else {
+        showErrorToast(consumoResult.message);
+        setStep("liberacoes");
+      }
+    } catch (error) {
+      console.error("Erro ao consumir liberação:", error);
+      setStep("liberacoes");
+    } finally {
+      setConsumingId(undefined);
     }
   };
 
@@ -75,16 +146,12 @@ export const BiometricApprovalScreen: React.FC = () => {
 
   const handleRetry = () => {
     setResult(null);
+    setTicketGerado(null);
     setStep("intro");
   };
 
   const handleClose = () => {
-    if (result?.success) {
-      // Aqui você pode navegar para aprovar tickets ou outra ação
-      navigation.goBack();
-    } else {
-      navigation.goBack();
-    }
+    navigation.goBack();
   };
 
   const renderIntro = () => (
@@ -93,21 +160,18 @@ export const BiometricApprovalScreen: React.FC = () => {
       contentContainerStyle={styles.scrollContent}
     >
       <Card style={styles.introCard}>
-        {/* Ícone */}
         <View style={styles.iconContainer}>
           <View style={styles.iconBackground}>
             <Ionicons name="scan" size={64} color={colors.primary} />
           </View>
         </View>
 
-        {/* Título */}
         <Text style={styles.introTitle}>Verificação Biométrica</Text>
         <Text style={styles.introSubtitle}>
-          Para aprovar tickets, precisamos verificar sua identidade através do
-          reconhecimento facial
+          Identifique o funcionário através do reconhecimento facial para
+          visualizar suas liberações disponíveis
         </Text>
 
-        {/* Instruções */}
         <View style={styles.instructionsContainer}>
           <Text style={styles.instructionsTitle}>Como funciona:</Text>
 
@@ -128,21 +192,21 @@ export const BiometricApprovalScreen: React.FC = () => {
               <Ionicons name="scan-circle" size={24} color={colors.primary} />
             </View>
             <View style={styles.instructionText}>
-              <Text style={styles.instructionStep}>2. Posicione seu rosto</Text>
+              <Text style={styles.instructionStep}>2. Capture o rosto</Text>
               <Text style={styles.instructionDescription}>
-                Mantenha seu rosto dentro do oval na tela
+                Posicione o rosto do funcionário na tela
               </Text>
             </View>
           </View>
 
           <View style={styles.instructionItem}>
             <View style={styles.instructionIcon}>
-              <Ionicons name="happy" size={24} color={colors.primary} />
+              <Ionicons name="list" size={24} color={colors.primary} />
             </View>
             <View style={styles.instructionText}>
-              <Text style={styles.instructionStep}>3. Complete desafios</Text>
+              <Text style={styles.instructionStep}>3. Veja as liberações</Text>
               <Text style={styles.instructionDescription}>
-                Vire o rosto e pisque/sorria quando solicitado
+                Lista de refeições disponíveis será exibida
               </Text>
             </View>
           </View>
@@ -156,15 +220,14 @@ export const BiometricApprovalScreen: React.FC = () => {
               />
             </View>
             <View style={styles.instructionText}>
-              <Text style={styles.instructionStep}>4. Confirmação</Text>
+              <Text style={styles.instructionStep}>4. Consuma o ticket</Text>
               <Text style={styles.instructionDescription}>
-                Verificaremos sua identidade automaticamente
+                Selecione a refeição para gerar o ticket
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Botões */}
         <View style={styles.buttonContainer}>
           <Button
             onPress={() => handleStartCamera("front")}
@@ -205,7 +268,7 @@ export const BiometricApprovalScreen: React.FC = () => {
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.processingTitle}>Verificando identidade...</Text>
         <Text style={styles.processingSubtitle}>
-          Analisando sua foto e comparando com nosso banco de dados
+          Analisando a foto e buscando liberações disponíveis
         </Text>
         {isVerifying && (
           <Text style={styles.processingHint}>
@@ -216,9 +279,20 @@ export const BiometricApprovalScreen: React.FC = () => {
     </View>
   );
 
+  const renderConsuming = () => (
+    <View style={styles.processingContainer}>
+      <Card style={styles.processingCard}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.processingTitle}>Gerando ticket...</Text>
+        <Text style={styles.processingSubtitle}>
+          Aguarde enquanto processamos a liberação
+        </Text>
+      </Card>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -230,7 +304,6 @@ export const BiometricApprovalScreen: React.FC = () => {
         <View style={styles.headerRight} />
       </View>
 
-      {/* Content */}
       {step === "intro" && renderIntro()}
 
       {step === "camera" && (
@@ -239,13 +312,28 @@ export const BiometricApprovalScreen: React.FC = () => {
           onCapture={handleCapture}
           onCancel={handleCancel}
           funcionarioNome={user?.nome}
-          solicitarSorriso={true}
+          solicitarSorriso={false}
         />
       )}
 
       {step === "processing" && renderProcessing()}
 
-      {step === "result" && result && (
+      {step === "liberacoes" &&
+        result?.funcionario &&
+        result?.liberacoes_disponiveis && (
+          <LiberacoesLista
+            liberacoes={result.liberacoes_disponiveis}
+            funcionarioNome={result.funcionario.nome}
+            funcionarioCpf={result.funcionario.cpf}
+            onConsumirLiberacao={handleConsumirLiberacao}
+            isConsuming={isConsuming}
+            consumingId={consumingId}
+          />
+        )}
+
+      {step === "consuming" && renderConsuming()}
+
+      {step === "result" && result && !result.liberacoes_disponiveis && (
         <FacialResult
           success={result.success}
           message={result.message}

@@ -1,46 +1,85 @@
 // src/services/facialRecognitionService.ts
+import { api } from "../lib/axios";
 import axios from "axios";
-import { Platform } from "react-native";
-
-// Configuração da URL baseada no ambiente
-const getBaseUrl = () => {
-  // Para desenvolvimento
-  if (__DEV__) {
-    if (Platform.OS === "android") {
-      return "http://192.168.0.133:3000"; // Seu IP local
-    }
-    // iOS simulator pode usar localhost
-    return "http://localhost:3000";
-  }
-
-  // Para produção (quando publicar)
-  return "http://191.35.131.10:3000"; // Mesmo servidor do Laravel
-};
-
-const FACIAL_API_URL = getBaseUrl();
 
 interface VerifyFaceRequest {
   imagem_base64: string;
   restaurante_id: number;
 }
 
+interface Liberacao {
+  id: number;
+  data: string;
+  data_formatada: string;
+  tipo_refeicao: {
+    id: number;
+    nome: string;
+  };
+}
+
+interface Funcionario {
+  id: number;
+  nome: string;
+  cpf: string;
+  foto_referencia?: string;
+}
+
+interface Reconhecimento {
+  similaridade: number;
+  distancia?: number;
+  tempo_processamento: number;
+}
+
 interface VerifyFaceResponse {
   success: boolean;
   message: string;
-  data?: {
-    funcionario_id: string;
+  funcionario?: Funcionario;
+  reconhecimento?: Reconhecimento;
+  liberacoes_disponiveis?: Liberacao[];
+  total_liberacoes?: number;
+}
+
+interface ConsumirLiberacaoRequest {
+  liberacao_id: number;
+  restaurante_id: number;
+  estabelecimento_id: number;
+}
+
+interface TicketConsumido {
+  id: number;
+  numero: string;
+  token: string;
+  token_formatado: string;
+  funcionario: {
+    id: number;
     nome: string;
-    similaridade: number;
-    distancia: number;
-    foto_referencia: string;
-    tempo_processamento: number;
+    cpf: string;
   };
-  bestMatch?: {
-    funcionarioId: string;
-    similarity: number;
-    threshold: number;
+  tipo_refeicao: {
+    id: number;
+    nome: string;
   };
-  tempoProcessamento: number;
+  restaurante: {
+    id: number;
+    nome: string;
+  };
+  valor: number;
+  valor_formatado: string;
+  status: number;
+  status_texto: string;
+  data_consumo: string;
+  data_liberacao: string;
+}
+
+interface ConsumirLiberacaoResponse {
+  success: boolean;
+  message: string;
+  ticket?: TicketConsumido;
+  liberacao?: {
+    id: number;
+    data: string;
+    tipo_refeicao: string;
+  };
 }
 
 interface ValidateImageRequest {
@@ -52,12 +91,6 @@ interface ValidateImageResponse {
   valid: boolean;
   facesCount: number;
   message: string;
-}
-
-interface EmployeeData {
-  id: string;
-  imagesCount: number;
-  images: string[];
 }
 
 interface HealthCheckResponse {
@@ -73,45 +106,49 @@ interface HealthCheckResponse {
 }
 
 class FacialRecognitionService {
-  private baseUrl: string;
-
-  constructor() {
-    this.baseUrl = FACIAL_API_URL;
-    console.log(`🔗 Facial API URL: ${this.baseUrl}`);
-  }
-
   /**
-   * Verifica identidade facial contra o banco de fotos
+   * Verifica identidade facial e retorna liberações disponíveis
    */
-  async verificarRosto(params: VerifyFaceRequest): Promise<VerifyFaceResponse> {
+  async verificarIdentidadeFacial(
+    params: VerifyFaceRequest
+  ): Promise<VerifyFaceResponse> {
     try {
       console.log("🔍 Iniciando verificação facial...");
+      console.log("📋 Parâmetros:", {
+        restaurante_id: params.restaurante_id,
+        imagem_tamanho: params.imagem_base64?.length || 0,
+      });
 
-      const response = await axios.post<VerifyFaceResponse>(
-        `${this.baseUrl}/api/facial/verify`,
-        params,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          timeout: 30000, // 30 segundos
-        }
+      const response = await api.post<VerifyFaceResponse>(
+        "/restaurante/facial/verificar",
+        params
       );
 
       console.log("✅ Verificação concluída:", response.data.success);
       return response.data;
     } catch (error) {
-      console.error("❌ Erro ao verificar rosto:", error);
+      console.error("❌ Erro ao verificar identidade:", error);
 
       if (axios.isAxiosError(error)) {
-        if (error.code === "ECONNREFUSED" || error.code === "ECONNABORTED") {
+        if (error.response?.status === 401) {
+          throw new Error("Sessão expirada. Por favor, faça login novamente.");
+        }
+        if (error.response?.status === 404) {
           throw new Error(
-            "Servidor de reconhecimento facial não está disponível. Verifique se está rodando."
+            "Endpoint não encontrado. Verifique se a API está configurada corretamente."
           );
         }
         if (error.response) {
+          const errorData = error.response.data as any;
           throw new Error(
-            error.response.data?.message || "Erro ao verificar identidade"
+            errorData?.error ||
+              errorData?.message ||
+              "Erro ao verificar identidade"
+          );
+        }
+        if (error.code === "ECONNREFUSED" || error.code === "ECONNABORTED") {
+          throw new Error(
+            "Servidor não está disponível. Verifique sua conexão."
           );
         }
         if (error.request) {
@@ -126,21 +163,58 @@ class FacialRecognitionService {
   }
 
   /**
+   * Consome liberação e gera ticket
+   */
+  async consumirLiberacao(
+    params: ConsumirLiberacaoRequest
+  ): Promise<ConsumirLiberacaoResponse> {
+    try {
+      console.log("🎫 Consumindo liberação...");
+      console.log("📋 Parâmetros:", params);
+
+      const response = await api.post<ConsumirLiberacaoResponse>(
+        "/restaurante/facial/consumir-liberacao",
+        params
+      );
+
+      console.log("✅ Liberação consumida:", response.data.success);
+      return response.data;
+    } catch (error) {
+      console.error("❌ Erro ao consumir liberação:", error);
+
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          throw new Error("Sessão expirada. Por favor, faça login novamente.");
+        }
+        if (error.response) {
+          const errorData = error.response.data as any;
+          throw new Error(
+            errorData?.error ||
+              errorData?.message ||
+              "Erro ao consumir liberação"
+          );
+        }
+        if (error.request) {
+          throw new Error(
+            "Não foi possível conectar ao servidor. Verifique sua conexão."
+          );
+        }
+      }
+
+      throw new Error("Erro ao consumir liberação");
+    }
+  }
+
+  /**
    * Valida se imagem contém exatamente um rosto
    */
   async validarImagem(
     params: ValidateImageRequest
   ): Promise<ValidateImageResponse> {
     try {
-      const response = await axios.post<ValidateImageResponse>(
-        `${this.baseUrl}/api/facial/validate`,
-        params,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          timeout: 15000,
-        }
+      const response = await api.post<ValidateImageResponse>(
+        "/restaurante/facial/validate",
+        params
       );
 
       return response.data;
@@ -151,34 +225,12 @@ class FacialRecognitionService {
   }
 
   /**
-   * Lista funcionários com fotos cadastradas
-   */
-  async listarFuncionarios(): Promise<EmployeeData[]> {
-    try {
-      const response = await axios.get<{
-        success: boolean;
-        employees: EmployeeData[];
-      }>(`${this.baseUrl}/api/facial/employees`, {
-        timeout: 10000,
-      });
-
-      return response.data.employees || [];
-    } catch (error) {
-      console.error("❌ Erro ao listar funcionários:", error);
-      throw error;
-    }
-  }
-
-  /**
    * Verifica saúde da API de reconhecimento facial
    */
   async verificarSaude(): Promise<HealthCheckResponse> {
     try {
-      const response = await axios.get<HealthCheckResponse>(
-        `${this.baseUrl}/api/facial/health`,
-        {
-          timeout: 5000,
-        }
+      const response = await api.get<HealthCheckResponse>(
+        "/restaurante/facial/health"
       );
 
       return response.data;
@@ -191,13 +243,6 @@ class FacialRecognitionService {
         employeesWithFaces: 0,
       };
     }
-  }
-
-  /**
-   * Retorna a URL base configurada
-   */
-  getBaseUrl(): string {
-    return this.baseUrl;
   }
 }
 
