@@ -9,6 +9,7 @@ interface ActionCardProps {
   title: string;
   color: string;
   onPress: () => void;
+  badge?: number;
 }
 
 export const ActionCard: React.FC<ActionCardProps> = ({
@@ -16,6 +17,7 @@ export const ActionCard: React.FC<ActionCardProps> = ({
   title,
   color,
   onPress,
+  badge,
 }) => {
   return (
     <TouchableOpacity
@@ -24,8 +26,15 @@ export const ActionCard: React.FC<ActionCardProps> = ({
       activeOpacity={0.7}
     >
       <View style={styles.content}>
-        <View style={[styles.iconCircle, { borderColor: color }]}>
-          <Ionicons name={icon} size={28} color={color} />
+        <View style={styles.iconWrapper}>
+          <View style={[styles.iconCircle, { borderColor: color }]}>
+            <Ionicons name={icon} size={28} color={color} />
+          </View>
+          {badge !== undefined && badge > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge > 99 ? "99+" : badge}</Text>
+            </View>
+          )}
         </View>
         <Text style={styles.actionTitle}>{title}</Text>
       </View>
@@ -53,6 +62,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 16,
   },
+  iconWrapper: {
+    position: "relative",
+    marginBottom: 12,
+  },
   iconCircle: {
     width: 56,
     height: 56,
@@ -60,12 +73,35 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
   },
   actionTitle: {
     fontSize: 13,
     fontWeight: "500",
     color: colors.text.light,
     textAlign: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: colors.destructive,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: "#ffffff",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  badgeText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "bold",
   },
 });

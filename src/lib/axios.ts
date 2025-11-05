@@ -81,6 +81,19 @@ export const clearEncryptedToken = async () => {
 
 export const storeUserData = async (userData: User) => {
   try {
+    console.log("💾 [STORAGE] Armazenando dados do usuário:", {
+      id: userData.id,
+      nome: userData.nome,
+      login: userData.login,
+      id_perfil: userData.id_perfil,
+      perfil_descricao: userData.perfil_descricao,
+      id_estabelecimento: userData.id_estabelecimento,
+      nome_estabelecimento: userData.nome_estabelecimento,
+      id_restaurante: userData.id_restaurante,
+      nome_restaurante: userData.nome_restaurante,
+      id_empresa: userData.id_empresa,
+    });
+
     const encryptedUser = encryptData(userData);
     await storage.setItem("encryptedUser", encryptedUser);
     console.log("✅ Dados do usuário armazenados");
@@ -94,9 +107,25 @@ export const storeUserData = async (userData: User) => {
 export const getUserData = async (): Promise<User | null> => {
   try {
     const encryptedUser = await storage.getItem("encryptedUser");
-    if (!encryptedUser) return null;
+    if (!encryptedUser) {
+      console.log("⚠️ [STORAGE] Nenhum dado de usuário encontrado");
+      return null;
+    }
 
     const userData = decryptData(encryptedUser);
+
+    console.log("📂 [STORAGE] Dados do usuário recuperados:", {
+      id: userData?.id,
+      nome: userData?.nome,
+      login: userData?.login,
+      id_perfil: userData?.id_perfil,
+      perfil_descricao: userData?.perfil_descricao,
+      id_estabelecimento: userData?.id_estabelecimento,
+      nome_estabelecimento: userData?.nome_estabelecimento,
+      id_restaurante: userData?.id_restaurante,
+      nome_restaurante: userData?.nome_restaurante,
+    });
+
     return userData;
   } catch (error) {
     showErrorToast("Erro ao obter dados do usuário");
@@ -135,6 +164,14 @@ api.interceptors.request.use(
 
       console.log(`📡 ${config.method?.toUpperCase()} ${config.url}`);
 
+      // Log do body para requests POST/PUT/PATCH
+      if (
+        config.data &&
+        ["post", "put", "patch"].includes(config.method?.toLowerCase() || "")
+      ) {
+        console.log(`📤 [REQUEST BODY]:`, config.data);
+      }
+
       return config;
     } catch (error) {
       console.error("❌ Erro no interceptor de requisição:", error);
@@ -152,6 +189,52 @@ api.interceptors.response.use(
     console.log(
       `✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`
     );
+
+    // Log detalhado da resposta para endpoints de autenticação
+    if (response.config.url?.includes("/auth/")) {
+      console.log(
+        `📥 [RESPONSE DATA] ${response.config.url}:`,
+        JSON.stringify(response.data, null, 2)
+      );
+
+      // Se for resposta de login, logar especificamente os dados do usuário
+      if (response.config.url?.includes("/login")) {
+        const userData = response.data?.data?.usuario;
+        if (userData) {
+          console.log(`👤 [USER DATA FROM API]:`, {
+            id: userData.id,
+            nome: userData.nome,
+            login: userData.login,
+            email: userData.email,
+            id_perfil: userData.id_perfil,
+            perfil_descricao: userData.perfil_descricao,
+            id_estabelecimento: userData.id_estabelecimento,
+            nome_estabelecimento: userData.nome_estabelecimento,
+            id_restaurante: userData.id_restaurante,
+            nome_restaurante: userData.nome_restaurante,
+            id_empresa: userData.id_empresa,
+            status: userData.status,
+            alterou_senha: userData.alterou_senha,
+          });
+
+          console.log(`🔑 [PERMISSIONS FROM API]:`, userData.permissions);
+
+          // Identificar tipo de perfil
+          if (userData.id_perfil === 1) {
+            console.log(`🏢 [PERFIL API] ESTABELECIMENTO - id_perfil: 1`);
+          } else if (userData.id_perfil === 2) {
+            console.log(`🍽️ [PERFIL API] RESTAURANTE OPERADOR - id_perfil: 2`);
+          } else if (userData.id_perfil === 3) {
+            console.log(`👨‍💼 [PERFIL API] GERENTE RESTAURANTE - id_perfil: 3`);
+          } else {
+            console.log(
+              `❓ [PERFIL API] DESCONHECIDO - id_perfil: ${userData.id_perfil}`
+            );
+          }
+        }
+      }
+    }
+
     return response;
   },
   async (error: AxiosError) => {
@@ -162,8 +245,11 @@ api.interceptors.response.use(
     // Log do erro
     if (error.response) {
       console.error(
-        `❌ ${error.response.status} ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`,
-        error.response.data
+        `❌ ${error.response.status} ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`
+      );
+      console.error(
+        `❌ [ERROR RESPONSE]:`,
+        JSON.stringify(error.response.data, null, 2)
       );
     } else if (error.request) {
       console.error("❌ Sem resposta do servidor:", error.message);

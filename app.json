@@ -50,8 +50,6 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE"
       ],
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
       "package": "com.caio12323.eticketrestauranteapp",
       "usesCleartextTraffic": true
     },

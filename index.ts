@@ -1,3 +1,4 @@
+import "react-native-get-random-values";
 import { registerRootComponent } from "expo";
 import "./index.css";
 import App from "./App";

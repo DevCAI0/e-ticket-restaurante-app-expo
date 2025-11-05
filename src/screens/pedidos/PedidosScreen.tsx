@@ -1,3 +1,4 @@
+// src/screens/pedidos/PedidosScreen.tsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
@@ -9,6 +10,7 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,10 +22,12 @@ import {
 } from "../../types/pedidos";
 import { PedidosAPI } from "../../api/pedidos";
 import { useAuth } from "../../hooks/useAuth";
+import { useProfilePermissions } from "../../hooks/useProfilePermissions";
 import { showSuccessToast, showErrorToast } from "../../lib/toast";
 import { PedidoCard } from "./components/PedidoCard";
-import { PedidosHeader } from "./components/PedidosHeader";
 import { colors } from "../../constants/colors";
+import { BottomNav } from "../../components/common/BottomNav";
+import { usePedidosPendentes } from "../../hooks/usePedidosPendentes";
 
 interface PedidosScreenProps {
   navigation: any;
@@ -32,6 +36,15 @@ interface PedidosScreenProps {
 
 export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
   const { user } = useAuth();
+  const { isEstablishment, isRestaurant } = useProfilePermissions();
+
+  const {
+    count: pedidosPendentes,
+    hasNewOrders,
+    markAsViewed,
+  } = usePedidosPendentes();
+  const [activeTab, setActiveTab] = useState("pedidos");
+
   const [pedidos, setPedidos] = useState<PedidoSimplificado[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -52,20 +65,27 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
   const isInitialLoad = useRef(true);
   const isMounted = useRef(true);
 
-  const userType = user?.tipo_usuario || "indefinido";
-  const isEstabelecimento = userType === "estabelecimento";
-  const isRestaurante = userType === "restaurante";
+  const isEstabelecimento = isEstablishment();
+  const isRestaurante = isRestaurant();
 
-  // Atualizar quando retornar de outras telas
+  const getUserType = () => {
+    if (isEstabelecimento) return "estabelecimento";
+    if (isRestaurante) return "restaurante";
+    return "indefinido";
+  };
+
+  const userType = getUserType();
+
   useEffect(() => {
     const unsubscribe = navigation.addListener("focus", () => {
+      markAsViewed();
       if (!isInitialLoad.current) {
         loadPedidos(true);
       }
     });
 
     return unsubscribe;
-  }, [navigation]);
+  }, [navigation, markAsViewed]);
 
   useEffect(() => {
     return () => {
@@ -134,7 +154,6 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
           );
           setCurrentPage(1);
 
-          // Verificar status dos tickets entregues
           const pedidosEntregues = response.pedidos.filter(
             (p) => p.status === 5
           );
@@ -178,7 +197,6 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
         );
         setCurrentPage(currentPage + 1);
 
-        // Verificar status dos novos tickets entregues
         const pedidosEntregues = response.pedidos.filter((p) => p.status === 5);
         if (pedidosEntregues.length > 0) {
           checkTicketsStatus(pedidosEntregues);
@@ -331,8 +349,12 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
     navigation.navigate("AdicionarItens", { pedidoId: pedido.id });
   };
 
-  const handleDeliverToEmployee = (pedido: PedidoSimplificado) => {
-    navigation.navigate("EntregarFuncionario", { pedido });
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+
+    if (tab === "home") {
+      navigation.navigate("Home");
+    }
   };
 
   const renderPedido = ({
@@ -356,39 +378,30 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
       onMarkReady={() => handleMarkReady(item.id)}
       onShowQRCode={() => handleShowQRCode(item)}
       onScanQRCode={() => handleScanQRCode(item)}
-      onDeliverToEmployee={() => handleDeliverToEmployee(item)}
     />
   );
 
   const renderEmpty = () => {
-    const hasFilters = Object.values(filters).some(
-      (v) => v !== undefined && v !== null && v !== ""
-    );
-
     return (
       <View style={styles.emptyContainer}>
-        <Ionicons
-          name={hasFilters ? "search-outline" : "receipt-outline"}
-          size={64}
-          color={colors.muted.light}
-        />
+        <Ionicons name="cart-outline" size={80} color={colors.muted.light} />
         <Text style={styles.emptyTitle}>
-          {hasFilters ? "Nenhum pedido encontrado" : "Nenhum pedido criado"}
+          {isEstabelecimento
+            ? "Nenhum pedido criado"
+            : "Nenhum pedido recebido"}
         </Text>
         <Text style={styles.emptyDescription}>
-          {hasFilters
-            ? "Tente ajustar os filtros"
-            : isEstabelecimento
-              ? "Comece criando seu primeiro pedido"
-              : "Aguarde pedidos chegarem"}
+          {isEstabelecimento
+            ? "Comece criando seu primeiro pedido de refeições"
+            : "Aguarde pedidos das garagens chegarem"}
         </Text>
-        {isEstabelecimento && !hasFilters && (
+        {isEstabelecimento && (
           <TouchableOpacity
-            style={styles.createButton}
+            style={styles.createButtonEmpty}
             onPress={handleCreateNew}
           >
             <Ionicons name="add" size={20} color={colors.background.light} />
-            <Text style={styles.createButtonText}>Criar Pedido</Text>
+            <Text style={styles.createButtonText}>Criar Primeiro Pedido</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -400,7 +413,69 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
     return (
       <View style={styles.loadingMore}>
         <ActivityIndicator size="small" color={colors.primary} />
-        <Text style={styles.loadingMoreText}>Carregando mais pedidos...</Text>
+      </View>
+    );
+  };
+
+  const renderHeader = () => {
+    const filters_tabs = [
+      { value: "all", label: "Todos" },
+      { value: "today", label: "Hoje" },
+    ];
+
+    if (isEstabelecimento) {
+      filters_tabs.push(
+        { value: "1", label: "Pendentes" },
+        { value: "4", label: "Prontos" },
+        { value: "5", label: "Entregues" }
+      );
+    } else if (isRestaurante) {
+      filters_tabs.push(
+        { value: "1", label: "Pendentes" },
+        { value: "3", label: "Em Preparo" },
+        { value: "4", label: "Prontos" },
+        { value: "5", label: "Entregues" }
+      );
+    }
+
+    return (
+      <View style={styles.headerContainer}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={colors.muted.light} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Buscar pedido..."
+            placeholderTextColor={colors.muted.light}
+            value={searchTerm}
+            onChangeText={handleSearchChange}
+          />
+        </View>
+
+        <View style={styles.filterTabsContainer}>
+          {filters_tabs.map((filter) => (
+            <TouchableOpacity
+              key={filter.value}
+              style={[
+                styles.filterTab,
+                selectedStatus === filter.value && styles.filterTabActive,
+              ]}
+              onPress={() => handleStatusChange(filter.value)}
+            >
+              <Text
+                style={[
+                  styles.filterTabText,
+                  selectedStatus === filter.value && styles.filterTabTextActive,
+                ]}
+              >
+                {filter.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.countText}>
+          {pedidos.length} de {totalCount} pedidos
+        </Text>
       </View>
     );
   };
@@ -411,7 +486,6 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
         <StatusBar barStyle="dark-content" />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Carregando pedidos...</Text>
         </View>
       </SafeAreaView>
     );
@@ -421,22 +495,50 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
 
-      <PedidosHeader
-        isEstabelecimento={isEstabelecimento}
-        isRestaurante={isRestaurante}
-        searchTerm={searchTerm}
-        selectedStatus={selectedStatus}
-        totalCount={totalCount}
-        pedidos={pedidos}
-        onCreateNew={handleCreateNew}
-        onSearchChange={handleSearchChange}
-        onStatusChange={handleStatusChange}
-      />
+      <View style={styles.topBar}>
+        <View style={styles.topBarLeft}>
+          <View style={styles.logoContainer}>
+            <Ionicons name="receipt" size={24} color={colors.primary} />
+          </View>
+          <View>
+            <Text style={styles.title}>Pedidos</Text>
+            <Text style={styles.subtitle}>
+              {isEstabelecimento ? "Estabelecimento" : "Restaurante"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.topBarRight}>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons
+              name="sunny-outline"
+              size={24}
+              color={colors.text.light}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Ionicons
+              name="person-circle-outline"
+              size={24}
+              color={colors.text.light}
+            />
+          </TouchableOpacity>
+          {isEstabelecimento && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleCreateNew}
+            >
+              <Ionicons name="add" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
 
       <FlatList
         data={pedidos}
         renderItem={renderPedido}
         keyExtractor={(item) => `${item.id}-${item.codigo_pedido}`}
+        ListHeaderComponent={renderHeader}
         contentContainerStyle={[
           styles.listContent,
           pedidos.length === 0 && styles.listContentEmpty,
@@ -455,6 +557,13 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
         onEndReachedThreshold={0.5}
         showsVerticalScrollIndicator={false}
       />
+
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        pedidosPendentes={pedidosPendentes}
+        hasNewOrders={hasNewOrders}
+      />
     </SafeAreaView>
   );
 }
@@ -469,14 +578,109 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingText: {
-    marginTop: 12,
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.card.light,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  topBarLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  logoContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: colors.primary + "15",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text.light,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: colors.muted.light,
+    marginTop: 2,
+  },
+  topBarRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerContainer: {
+    padding: 16,
+    backgroundColor: colors.background.light,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.border.light,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 14,
+    color: colors.text.light,
+  },
+  filterTabsContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.border.light,
+  },
+  filterTabActive: {
+    backgroundColor: colors.primary + "15",
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: colors.text.light,
+  },
+  filterTabTextActive: {
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  countText: {
+    fontSize: 12,
     color: colors.muted.light,
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingTop: 12,
     paddingBottom: 16,
   },
   listContentEmpty: {
@@ -486,14 +690,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 64,
+    paddingVertical: 80,
     paddingHorizontal: 32,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600",
     color: colors.text.light,
-    marginTop: 16,
+    marginTop: 24,
     textAlign: "center",
   },
   emptyDescription: {
@@ -501,36 +705,25 @@ const styles = StyleSheet.create({
     color: colors.muted.light,
     marginTop: 8,
     textAlign: "center",
+    lineHeight: 20,
   },
-  createButton: {
+  createButtonEmpty: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.primary,
+    backgroundColor: colors.text.light,
     paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 8,
-    marginTop: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    marginTop: 32,
+    gap: 8,
   },
   createButtonText: {
     color: colors.background.light,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
-    marginLeft: 8,
   },
   loadingMore: {
-    flexDirection: "row",
+    paddingVertical: 20,
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-  },
-  loadingMoreText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: colors.muted.light,
   },
 });

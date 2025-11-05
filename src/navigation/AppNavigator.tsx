@@ -1,8 +1,9 @@
-// src/navigation/AppNavigator.tsx
+// src/navigation/AppNavigator.tsx - Atualizado com permissões
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../hooks/useAuth";
+import { useProfilePermissions } from "../hooks/useProfilePermissions";
 import { SignInScreen } from "../screens/auth/SignInScreen";
 import { HomeScreen } from "../screens/home/HomeScreen";
 import { ScannerScreen } from "../screens/tickets/ScannerScreen";
@@ -10,6 +11,7 @@ import { ManualVerificationScreen } from "../screens/tickets/ManualVerificationS
 import { BiometricApprovalScreen } from "../screens/facial/BiometricApprovalScreen";
 import { PedidosScreen } from "../screens/pedidos/PedidosScreen";
 import { PedidoDetalhesScreen } from "../screens/pedidos/PedidoDetalhesScreen";
+import { CriarPedidoScreen } from "../screens/pedidos/components/CriarPedidoScreen";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { colors } from "../constants/colors";
 import { routes } from "./routes";
@@ -56,6 +58,7 @@ const LoadingScreen = () => (
 
 export const AppNavigator: React.FC = () => {
   const { user, loading } = useAuth();
+  const { canAccessTickets, canAccessOrders } = useProfilePermissions();
 
   if (loading) {
     return <LoadingScreen />;
@@ -71,43 +74,54 @@ export const AppNavigator: React.FC = () => {
       >
         {user ? (
           <>
+            {/* Home - Todos têm acesso */}
             <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen
-              name="Scanner"
-              component={ScannerScreen}
-              options={{
-                presentation: "fullScreenModal",
-                animation: "slide_from_bottom",
-              }}
-            />
-            <Stack.Screen
-              name="ManualVerification"
-              component={ManualVerificationScreen}
-            />
-            <Stack.Screen
-              name="BiometricApproval"
-              component={BiometricApprovalScreen}
-              options={{
-                presentation: "modal",
-                animation: "slide_from_bottom",
-              }}
-            />
 
-            {/* Pedidos Routes */}
-            <Stack.Screen name="Pedidos" component={PedidosScreen} />
-            <Stack.Screen
-              name="PedidoDetalhes"
-              component={PedidoDetalhesScreen}
-            />
-            {/* TODO: Adicionar as outras telas de pedidos quando estiverem prontas:
-            <Stack.Screen name="CriarPedido" component={CriarPedidoScreen} />
-            <Stack.Screen name="AdicionarItens" component={AdicionarItensScreen} />
-            <Stack.Screen name="RecusarPedido" component={RecusarPedidoScreen} />
-            <Stack.Screen name="CancelarPedido" component={CancelarPedidoScreen} />
-            <Stack.Screen name="QRCode" component={QRCodeScreen} />
-            <Stack.Screen name="QRScanner" component={QRScannerScreen} />
-            <Stack.Screen name="EntregarFuncionario" component={EntregarFuncionarioScreen} />
-            */}
+            {/* Tickets Routes - Apenas para usuários com permissão */}
+            {canAccessTickets() && (
+              <>
+                <Stack.Screen
+                  name="Scanner"
+                  component={ScannerScreen}
+                  options={{
+                    presentation: "fullScreenModal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                <Stack.Screen
+                  name="ManualVerification"
+                  component={ManualVerificationScreen}
+                />
+                <Stack.Screen
+                  name="BiometricApproval"
+                  component={BiometricApprovalScreen}
+                  options={{
+                    presentation: "modal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+              </>
+            )}
+
+            {/* Pedidos Routes - Apenas para usuários com permissão */}
+            {canAccessOrders() && (
+              <>
+                <Stack.Screen name="Pedidos" component={PedidosScreen} />
+                <Stack.Screen
+                  name="PedidoDetalhes"
+                  component={PedidoDetalhesScreen}
+                />
+                <Stack.Screen
+                  name="CriarPedido"
+                  component={CriarPedidoScreen}
+                  options={{
+                    presentation: "modal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                {/* TODO: Adicionar as outras telas de pedidos quando estiverem prontas */}
+              </>
+            )}
           </>
         ) : (
           <Stack.Screen name="SignIn" component={SignInScreen} />
