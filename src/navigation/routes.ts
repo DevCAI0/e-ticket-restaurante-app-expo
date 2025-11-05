@@ -15,6 +15,17 @@ export const routes = {
   // Biometric Routes
   BIOMETRIC_APPROVAL: "BiometricApproval",
 
+  // Pedidos Routes
+  PEDIDOS: "Pedidos",
+  PEDIDO_DETALHES: "PedidoDetalhes",
+  CRIAR_PEDIDO: "CriarPedido",
+  ADICIONAR_ITENS: "AdicionarItens",
+  RECUSAR_PEDIDO: "RecusarPedido",
+  CANCELAR_PEDIDO: "CancelarPedido",
+  QR_CODE: "QRCode",
+  QR_SCANNER: "QRScanner",
+  ENTREGAR_FUNCIONARIO: "EntregarFuncionario",
+
   // Other Routes
   ORDERS: "Orders",
   SETTINGS: "Settings",

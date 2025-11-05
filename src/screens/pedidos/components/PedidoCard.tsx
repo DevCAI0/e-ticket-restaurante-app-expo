@@ -44,57 +44,57 @@ export function PedidoCard({
     switch (status) {
       case 1:
         return {
-          color: colors.yellow[500],
-          bgColor: colors.yellow[100],
-          textColor: colors.yellow[800],
+          color: colors.warning,
+          bgColor: colors.warning + "15",
+          textColor: colors.warning,
           icon: "time-outline" as const,
           label: "Pendente",
         };
       case 3:
         return {
-          color: colors.purple[500],
-          bgColor: colors.purple[100],
-          textColor: colors.purple[800],
+          color: colors.info,
+          bgColor: colors.info + "15",
+          textColor: colors.info,
           icon: "restaurant-outline" as const,
           label: "Em Preparo",
         };
       case 4:
         return {
-          color: colors.orange[500],
-          bgColor: colors.orange[100],
-          textColor: colors.orange[800],
+          color: colors.primary,
+          bgColor: colors.primary + "15",
+          textColor: colors.primary,
           icon: "checkmark-circle-outline" as const,
           label: "Pronto",
         };
       case 5:
         return {
-          color: colors.green[500],
-          bgColor: colors.green[100],
-          textColor: colors.green[800],
+          color: colors.success,
+          bgColor: colors.success + "15",
+          textColor: colors.success,
           icon: "checkmark-done-outline" as const,
           label: "Entregue",
         };
       case 6:
         return {
-          color: colors.red[500],
-          bgColor: colors.red[100],
-          textColor: colors.red[800],
+          color: colors.destructive.light,
+          bgColor: colors.destructive.light + "15",
+          textColor: colors.destructive.light,
           icon: "close-circle-outline" as const,
           label: "Recusado",
         };
       case 7:
         return {
-          color: colors.gray[500],
-          bgColor: colors.gray[100],
-          textColor: colors.gray[800],
+          color: colors.muted.light,
+          bgColor: colors.border.light,
+          textColor: colors.muted.light,
           icon: "ban-outline" as const,
           label: "Cancelado",
         };
       default:
         return {
-          color: colors.gray[500],
-          bgColor: colors.gray[100],
-          textColor: colors.gray[800],
+          color: colors.muted.light,
+          bgColor: colors.border.light,
+          textColor: colors.muted.light,
           icon: "alert-circle-outline" as const,
           label: "Indefinido",
         };
@@ -132,10 +132,14 @@ export function PedidoCard({
             disabled={loadingAction !== ""}
           >
             {loadingAction === "adding" ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={colors.background.light} />
             ) : (
               <>
-                <Ionicons name="add" size={16} color={colors.white} />
+                <Ionicons
+                  name="add"
+                  size={16}
+                  color={colors.background.light}
+                />
                 <Text style={styles.primaryButtonText}>Adicionar</Text>
               </>
             )}
@@ -150,10 +154,14 @@ export function PedidoCard({
             disabled={loadingAction === "canceling"}
           >
             {loadingAction === "canceling" ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={colors.background.light} />
             ) : (
               <>
-                <Ionicons name="trash-outline" size={16} color={colors.white} />
+                <Ionicons
+                  name="trash-outline"
+                  size={16}
+                  color={colors.background.light}
+                />
                 <Text style={styles.dangerButtonText}>Cancelar</Text>
               </>
             )}
@@ -170,10 +178,14 @@ export function PedidoCard({
             disabled={loadingAction === "accepting"}
           >
             {loadingAction === "accepting" ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={colors.background.light} />
             ) : (
               <>
-                <Ionicons name="checkmark" size={16} color={colors.white} />
+                <Ionicons
+                  name="checkmark"
+                  size={16}
+                  color={colors.background.light}
+                />
                 <Text style={styles.successButtonText}>Aceitar</Text>
               </>
             )}
@@ -188,10 +200,14 @@ export function PedidoCard({
             disabled={loadingAction === "rejecting"}
           >
             {loadingAction === "rejecting" ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={colors.background.light} />
             ) : (
               <>
-                <Ionicons name="close" size={16} color={colors.white} />
+                <Ionicons
+                  name="close"
+                  size={16}
+                  color={colors.background.light}
+                />
                 <Text style={styles.dangerButtonText}>Recusar</Text>
               </>
             )}
@@ -210,13 +226,13 @@ export function PedidoCard({
           disabled={loadingAction === "ready"}
         >
           {loadingAction === "ready" ? (
-            <ActivityIndicator size="small" color={colors.white} />
+            <ActivityIndicator size="small" color={colors.background.light} />
           ) : (
             <>
               <Ionicons
                 name="checkmark-circle"
                 size={16}
-                color={colors.white}
+                color={colors.background.light}
               />
               <Text style={styles.warningButtonText}>Pronto</Text>
             </>
@@ -234,7 +250,11 @@ export function PedidoCard({
             style={[styles.actionButton, styles.successButton]}
             onPress={onShowQRCode}
           >
-            <Ionicons name="qr-code" size={16} color={colors.white} />
+            <Ionicons
+              name="qr-code"
+              size={16}
+              color={colors.background.light}
+            />
             <Text style={styles.successButtonText}>QR Code</Text>
           </TouchableOpacity>
         );
@@ -249,10 +269,14 @@ export function PedidoCard({
             disabled={loadingAction === "delivering"}
           >
             {loadingAction === "delivering" ? (
-              <ActivityIndicator size="small" color={colors.white} />
+              <ActivityIndicator size="small" color={colors.background.light} />
             ) : (
               <>
-                <Ionicons name="camera" size={16} color={colors.white} />
+                <Ionicons
+                  name="camera"
+                  size={16}
+                  color={colors.background.light}
+                />
                 <Text style={styles.successButtonText}>Escanear</Text>
               </>
             )}
@@ -268,7 +292,7 @@ export function PedidoCard({
         style={[styles.actionButton, styles.secondaryButton]}
         onPress={onViewDetails}
       >
-        <Ionicons name="eye-outline" size={16} color={colors.gray[700]} />
+        <Ionicons name="eye-outline" size={16} color={colors.text.light} />
         <Text style={styles.secondaryButtonText}>Detalhes</Text>
       </TouchableOpacity>
     );
@@ -315,7 +339,7 @@ export function PedidoCard({
             <Ionicons
               name={statusConfig.icon}
               size={14}
-              color={colors.gray[600]}
+              color={colors.muted.light}
             />
             <Text style={styles.timeText}>
               {formatTime(pedido.data_pedido)}
@@ -336,7 +360,7 @@ export function PedidoCard({
             <Ionicons
               name="checkmark-circle"
               size={14}
-              color={colors.green[700]}
+              color={colors.success}
             />
             <Text style={styles.deliveredText}>Todos os tickets entregues</Text>
           </View>
@@ -350,10 +374,10 @@ export function PedidoCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.light,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: colors.border.light,
     padding: 16,
     marginBottom: 12,
     shadowColor: "#000",
@@ -398,7 +422,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.gray[900],
+    color: colors.text.light,
     marginBottom: 8,
   },
   info: {
@@ -411,7 +435,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
   },
   timeRow: {
     flexDirection: "row",
@@ -420,17 +444,17 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
   },
   observationsContainer: {
     marginTop: 8,
     padding: 8,
-    backgroundColor: colors.gray[50],
+    backgroundColor: colors.border.light,
     borderRadius: 6,
   },
   observationsText: {
     fontSize: 12,
-    color: colors.gray[700],
+    color: colors.text.light,
   },
   deliveredBadge: {
     flexDirection: "row",
@@ -439,14 +463,14 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    backgroundColor: colors.green[50],
+    backgroundColor: colors.success + "15",
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: colors.green[200],
+    borderColor: colors.success + "30",
   },
   deliveredText: {
     fontSize: 11,
-    color: colors.green[700],
+    color: colors.success,
   },
   actionsContainer: {
     flexDirection: "row",
@@ -466,39 +490,39 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   primaryButtonText: {
-    color: colors.white,
+    color: colors.background.light,
     fontSize: 12,
     fontWeight: "600",
   },
   secondaryButton: {
-    backgroundColor: colors.gray[100],
+    backgroundColor: colors.border.light,
   },
   secondaryButtonText: {
-    color: colors.gray[700],
+    color: colors.text.light,
     fontSize: 12,
     fontWeight: "600",
   },
   successButton: {
-    backgroundColor: colors.green[600],
+    backgroundColor: colors.success,
   },
   successButtonText: {
-    color: colors.white,
+    color: colors.background.light,
     fontSize: 12,
     fontWeight: "600",
   },
   warningButton: {
-    backgroundColor: colors.orange[600],
+    backgroundColor: colors.primary,
   },
   warningButtonText: {
-    color: colors.white,
+    color: colors.background.light,
     fontSize: 12,
     fontWeight: "600",
   },
   dangerButton: {
-    backgroundColor: colors.red[600],
+    backgroundColor: colors.destructive.light,
   },
   dangerButtonText: {
-    color: colors.white,
+    color: colors.background.light,
     fontSize: 12,
     fontWeight: "600",
   },

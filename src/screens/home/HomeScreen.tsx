@@ -25,24 +25,40 @@ export const HomeScreen: React.FC = () => {
     await logout();
   };
 
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+
+    // Navegar para a tela correspondente
+    if (tab === "pedidos") {
+      navigation.navigate("Pedidos");
+    }
+    // Adicione outras navegações conforme necessário
+  };
+
   const dashboardActions = [
     {
       icon: "scan" as keyof typeof Ionicons.glyphMap,
       title: "Ler Tickets",
       color: "#FB923C",
-      onPress: () => navigation.navigate("Scanner" as any),
+      onPress: () => navigation.navigate("Scanner"),
     },
     {
       icon: "search" as keyof typeof Ionicons.glyphMap,
       title: "Manualmente",
       color: "#3B82F6",
-      onPress: () => navigation.navigate("ManualVerification" as any),
+      onPress: () => navigation.navigate("ManualVerification"),
     },
     {
       icon: "checkmark-circle" as keyof typeof Ionicons.glyphMap,
       title: "Aprovar Tickets",
       color: "#22C55E",
-      onPress: () => navigation.navigate("BiometricApproval" as any),
+      onPress: () => navigation.navigate("BiometricApproval"),
+    },
+    {
+      icon: "receipt" as keyof typeof Ionicons.glyphMap,
+      title: "Ver Pedidos",
+      color: "#F97316",
+      onPress: () => navigation.navigate("Pedidos"),
     },
   ];
 
@@ -72,7 +88,7 @@ export const HomeScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
     </SafeAreaView>
   );
 };

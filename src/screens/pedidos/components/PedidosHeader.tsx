@@ -103,13 +103,13 @@ export function PedidosHeader({
         <Ionicons
           name="search"
           size={20}
-          color={colors.gray[500]}
+          color={colors.muted.light}
           style={styles.searchIcon}
         />
         <TextInput
           style={styles.searchInput}
           placeholder="Buscar pedido..."
-          placeholderTextColor={colors.gray[500]}
+          placeholderTextColor={colors.muted.light}
           value={searchTerm}
           onChangeText={onSearchChange}
         />
@@ -170,12 +170,12 @@ export function PedidosHeader({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.light,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
+    borderBottomColor: colors.border.light,
   },
   topBar: {
     flexDirection: "row",
@@ -186,11 +186,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: "700",
-    color: colors.gray[900],
+    color: colors.text.light,
   },
   subtitle: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
     marginTop: 2,
   },
   createButton: {
@@ -205,10 +205,10 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.gray[50],
+    backgroundColor: colors.border.light,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: colors.border.light,
     paddingHorizontal: 12,
     marginBottom: 12,
   },
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 44,
     fontSize: 14,
-    color: colors.gray[900],
+    color: colors.text.light,
   },
   filtersContainer: {
     marginBottom: 12,
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: colors.gray[100],
+    backgroundColor: colors.border.light,
     gap: 6,
   },
   filterPillActive: {
@@ -245,14 +245,14 @@ const styles = StyleSheet.create({
   filterLabel: {
     fontSize: 12,
     fontWeight: "500",
-    color: colors.gray[700],
+    color: colors.text.light,
   },
   filterLabelActive: {
     color: colors.primary,
     fontWeight: "600",
   },
   countBadge: {
-    backgroundColor: colors.gray[200],
+    backgroundColor: colors.background.light,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   countText: {
     fontSize: 11,
     fontWeight: "600",
-    color: colors.gray[700],
+    color: colors.text.light,
   },
   countTextActive: {
     color: colors.primary,
@@ -275,6 +275,6 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
   },
 });

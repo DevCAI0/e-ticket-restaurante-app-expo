@@ -8,9 +8,12 @@ import { HomeScreen } from "../screens/home/HomeScreen";
 import { ScannerScreen } from "../screens/tickets/ScannerScreen";
 import { ManualVerificationScreen } from "../screens/tickets/ManualVerificationScreen";
 import { BiometricApprovalScreen } from "../screens/facial/BiometricApprovalScreen";
+import { PedidosScreen } from "../screens/pedidos/PedidosScreen";
+import { PedidoDetalhesScreen } from "../screens/pedidos/PedidoDetalhesScreen";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { colors } from "../constants/colors";
 import { routes } from "./routes";
+import { PedidoSimplificado } from "../types/pedidos";
 
 export type RootStackParamList = {
   SignIn: undefined;
@@ -18,6 +21,29 @@ export type RootStackParamList = {
   Scanner: undefined;
   ManualVerification: undefined;
   BiometricApproval: undefined;
+  Pedidos: undefined;
+  PedidoDetalhes: {
+    pedidoId: number;
+  };
+  CriarPedido: undefined;
+  AdicionarItens: {
+    pedidoId: number;
+  };
+  RecusarPedido: {
+    pedido: PedidoSimplificado;
+  };
+  CancelarPedido: {
+    pedido: PedidoSimplificado;
+  };
+  QRCode: {
+    pedido: PedidoSimplificado;
+  };
+  QRScanner: {
+    pedido: PedidoSimplificado;
+  };
+  EntregarFuncionario: {
+    pedido: PedidoSimplificado;
+  };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -66,6 +92,22 @@ export const AppNavigator: React.FC = () => {
                 animation: "slide_from_bottom",
               }}
             />
+
+            {/* Pedidos Routes */}
+            <Stack.Screen name="Pedidos" component={PedidosScreen} />
+            <Stack.Screen
+              name="PedidoDetalhes"
+              component={PedidoDetalhesScreen}
+            />
+            {/* TODO: Adicionar as outras telas de pedidos quando estiverem prontas:
+            <Stack.Screen name="CriarPedido" component={CriarPedidoScreen} />
+            <Stack.Screen name="AdicionarItens" component={AdicionarItensScreen} />
+            <Stack.Screen name="RecusarPedido" component={RecusarPedidoScreen} />
+            <Stack.Screen name="CancelarPedido" component={CancelarPedidoScreen} />
+            <Stack.Screen name="QRCode" component={QRCodeScreen} />
+            <Stack.Screen name="QRScanner" component={QRScannerScreen} />
+            <Stack.Screen name="EntregarFuncionario" component={EntregarFuncionarioScreen} />
+            */}
           </>
         ) : (
           <Stack.Screen name="SignIn" component={SignInScreen} />

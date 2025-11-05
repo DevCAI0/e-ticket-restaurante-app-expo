@@ -86,43 +86,43 @@ export function PedidoDetalhesScreen({
     switch (status) {
       case 1:
         return {
-          color: colors.yellow[500],
+          color: colors.warning,
           label: "Pendente",
           icon: "time-outline",
         };
       case 3:
         return {
-          color: colors.purple[500],
+          color: colors.info,
           label: "Em Preparo",
           icon: "restaurant-outline",
         };
       case 4:
         return {
-          color: colors.orange[500],
+          color: colors.primary,
           label: "Pronto",
           icon: "checkmark-circle-outline",
         };
       case 5:
         return {
-          color: colors.green[500],
+          color: colors.success,
           label: "Entregue",
           icon: "checkmark-done-outline",
         };
       case 6:
         return {
-          color: colors.red[500],
+          color: colors.destructive.light,
           label: "Recusado",
           icon: "close-circle-outline",
         };
       case 7:
         return {
-          color: colors.gray[500],
+          color: colors.muted.light,
           label: "Cancelado",
           icon: "ban-outline",
         };
       default:
         return {
-          color: colors.gray[500],
+          color: colors.muted.light,
           label: "Indefinido",
           icon: "alert-circle-outline",
         };
@@ -162,7 +162,7 @@ export function PedidoDetalhesScreen({
           <Ionicons
             name="alert-circle-outline"
             size={64}
-            color={colors.red[500]}
+            color={colors.destructive.light}
           />
           <Text style={styles.errorText}>Pedido não encontrado</Text>
           <TouchableOpacity
@@ -186,7 +186,7 @@ export function PedidoDetalhesScreen({
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.gray[900]} />
+          <Ionicons name="arrow-back" size={24} color={colors.text.light} />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.title}>Pedido #{pedido.codigo_pedido}</Text>
@@ -211,7 +211,11 @@ export function PedidoDetalhesScreen({
 
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <Ionicons name="restaurant" size={20} color={colors.gray[600]} />
+              <Ionicons
+                name="restaurant"
+                size={20}
+                color={colors.muted.light}
+              />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Restaurante</Text>
                 <Text style={styles.infoValue}>{pedido.restaurante.nome}</Text>
@@ -226,7 +230,7 @@ export function PedidoDetalhesScreen({
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Ionicons name="business" size={20} color={colors.gray[600]} />
+              <Ionicons name="business" size={20} color={colors.muted.light} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Estabelecimento</Text>
                 <Text style={styles.infoValue}>
@@ -238,7 +242,7 @@ export function PedidoDetalhesScreen({
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Ionicons name="person" size={20} color={colors.gray[600]} />
+              <Ionicons name="person" size={20} color={colors.muted.light} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Solicitante</Text>
                 <Text style={styles.infoValue}>{pedido.solicitante.nome}</Text>
@@ -248,7 +252,7 @@ export function PedidoDetalhesScreen({
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Ionicons name="calendar" size={20} color={colors.gray[600]} />
+              <Ionicons name="calendar" size={20} color={colors.muted.light} />
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>Data do Pedido</Text>
                 <Text style={styles.infoValue}>
@@ -278,10 +282,7 @@ export function PedidoDetalhesScreen({
             <View style={styles.timelineCard}>
               <View style={styles.timelineItem}>
                 <View
-                  style={[
-                    styles.timelineDot,
-                    { backgroundColor: colors.blue[500] },
-                  ]}
+                  style={[styles.timelineDot, { backgroundColor: colors.info }]}
                 />
                 <View style={styles.timelineContent}>
                   <Text style={styles.timelineTitle}>Pedido Criado</Text>
@@ -296,7 +297,7 @@ export function PedidoDetalhesScreen({
                   <View
                     style={[
                       styles.timelineDot,
-                      { backgroundColor: colors.green[500] },
+                      { backgroundColor: colors.success },
                     ]}
                   />
                   <View style={styles.timelineContent}>
@@ -320,7 +321,7 @@ export function PedidoDetalhesScreen({
                   <View
                     style={[
                       styles.timelineDot,
-                      { backgroundColor: colors.orange[500] },
+                      { backgroundColor: colors.primary },
                     ]}
                   />
                   <View style={styles.timelineContent}>
@@ -342,7 +343,7 @@ export function PedidoDetalhesScreen({
                   <View
                     style={[
                       styles.timelineDot,
-                      { backgroundColor: colors.green[600] },
+                      { backgroundColor: colors.success },
                     ]}
                   />
                   <View style={styles.timelineContent}>
@@ -364,7 +365,7 @@ export function PedidoDetalhesScreen({
                   <View
                     style={[
                       styles.timelineDot,
-                      { backgroundColor: colors.red[500] },
+                      { backgroundColor: colors.destructive.light },
                     ]}
                   />
                   <View style={styles.timelineContent}>
@@ -391,7 +392,7 @@ export function PedidoDetalhesScreen({
                   <View
                     style={[
                       styles.timelineDot,
-                      { backgroundColor: colors.gray[500] },
+                      { backgroundColor: colors.muted.light },
                     ]}
                   />
                   <View style={styles.timelineContent}>
@@ -433,12 +434,15 @@ export function PedidoDetalhesScreen({
                     disabled={removingItem === item.id}
                   >
                     {removingItem === item.id ? (
-                      <ActivityIndicator size="small" color={colors.red[600]} />
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.destructive.light}
+                      />
                     ) : (
                       <Ionicons
                         name="trash-outline"
                         size={20}
-                        color={colors.red[600]}
+                        color={colors.destructive.light}
                       />
                     )}
                   </TouchableOpacity>
@@ -446,7 +450,7 @@ export function PedidoDetalhesScreen({
               </View>
 
               <View style={styles.itemInfo}>
-                <Ionicons name="person" size={16} color={colors.gray[600]} />
+                <Ionicons name="person" size={16} color={colors.muted.light} />
                 <Text style={styles.itemName}>{item.nome_funcionario}</Text>
               </View>
 
@@ -454,7 +458,7 @@ export function PedidoDetalhesScreen({
                 <Ionicons
                   name="restaurant"
                   size={16}
-                  color={colors.gray[600]}
+                  color={colors.muted.light}
                 />
                 <Text style={styles.itemMeal}>
                   {TIPOS_REFEICAO[
@@ -470,7 +474,7 @@ export function PedidoDetalhesScreen({
               <Ionicons
                 name="receipt-outline"
                 size={48}
-                color={colors.gray[400]}
+                color={colors.muted.light}
               />
               <Text style={styles.emptyItemsText}>Nenhum item no pedido</Text>
             </View>
@@ -484,7 +488,7 @@ export function PedidoDetalhesScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background.light,
   },
   loadingContainer: {
     flex: 1,
@@ -494,7 +498,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: colors.gray[600],
+    color: colors.muted.light,
   },
   errorContainer: {
     flex: 1,
@@ -506,7 +510,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontWeight: "600",
-    color: colors.gray[900],
+    color: colors.text.light,
   },
   header: {
     flexDirection: "row",
@@ -514,9 +518,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.light,
     borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
+    borderBottomColor: colors.border.light,
   },
   backButton: {
     padding: 4,
@@ -528,11 +532,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: colors.gray[900],
+    color: colors.text.light,
   },
   subtitle: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
     marginTop: 2,
   },
   statusBadge: {
@@ -542,7 +546,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: colors.gray[100],
+    backgroundColor: colors.border.light,
   },
   statusText: {
     fontSize: 12,
@@ -557,15 +561,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: colors.gray[900],
+    color: colors.text.light,
     marginBottom: 12,
   },
   infoCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.light,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: colors.border.light,
   },
   infoRow: {
     flexDirection: "row",
@@ -577,49 +581,49 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.gray[900],
+    color: colors.text.light,
   },
   infoSubvalue: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
     marginTop: 2,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.gray[200],
+    backgroundColor: colors.border.light,
     marginVertical: 12,
   },
   observationsCard: {
     marginTop: 12,
-    backgroundColor: colors.gray[50],
+    backgroundColor: colors.border.light,
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: colors.border.light,
   },
   observationsLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: colors.gray[700],
+    color: colors.text.light,
     marginBottom: 6,
   },
   observationsText: {
     fontSize: 14,
-    color: colors.gray[900],
+    color: colors.text.light,
     lineHeight: 20,
   },
   timelineCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.light,
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: colors.border.light,
   },
   timelineItem: {
     flexDirection: "row",
@@ -638,30 +642,30 @@ const styles = StyleSheet.create({
   timelineTitle: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.gray[900],
+    color: colors.text.light,
     marginBottom: 4,
   },
   timelineTime: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
   },
   timelineUser: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
     marginTop: 2,
   },
   timelineReason: {
     fontSize: 12,
-    color: colors.red[600],
+    color: colors.destructive.light,
     marginTop: 4,
   },
   itemCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card.light,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.gray[200],
+    borderColor: colors.border.light,
   },
   itemHeader: {
     flexDirection: "row",
@@ -672,11 +676,11 @@ const styles = StyleSheet.create({
   itemTicket: {
     fontSize: 16,
     fontWeight: "700",
-    color: colors.gray[900],
+    color: colors.text.light,
   },
   itemType: {
     fontSize: 12,
-    color: colors.gray[600],
+    color: colors.muted.light,
     marginTop: 2,
   },
   removeButton: {
@@ -691,11 +695,11 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.gray[900],
+    color: colors.text.light,
   },
   itemMeal: {
     fontSize: 14,
-    color: colors.gray[700],
+    color: colors.text.light,
   },
   emptyItems: {
     alignItems: "center",
@@ -705,7 +709,7 @@ const styles = StyleSheet.create({
   emptyItemsText: {
     marginTop: 12,
     fontSize: 14,
-    color: colors.gray[600],
+    color: colors.muted.light,
   },
   button: {
     marginTop: 24,
@@ -715,7 +719,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
-    color: colors.white,
+    color: colors.background.light,
     fontSize: 16,
     fontWeight: "600",
   },
