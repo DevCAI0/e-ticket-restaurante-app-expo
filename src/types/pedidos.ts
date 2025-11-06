@@ -1,3 +1,4 @@
+// src/types/pedidos.ts
 export interface Estabelecimento {
   id: number;
   nome: string;
@@ -10,17 +11,22 @@ export interface Restaurante {
   logradouro?: string;
 }
 
+export interface TipoRefeicaoDisponivel {
+  id: number;
+  nome: string;
+  valor: number;
+  valor_formatado: string;
+  quota_total: number;
+  quota_utilizada: number;
+  quota_disponivel: number;
+}
+
 export interface RestauranteDisponivel {
   id: number;
   nome: string;
   logradouro?: string;
-  id_estabelecimento: number;
+  tem_configuracao: boolean;
   tipos_refeicao_disponiveis: TipoRefeicaoDisponivel[];
-}
-
-export interface TipoRefeicaoDisponivel {
-  id: number;
-  nome: string;
 }
 
 export interface Usuario {
@@ -39,11 +45,6 @@ export interface Funcionario {
   cpf: string;
 }
 
-export interface AdicionarItensRequest {
-  tickets: string[];
-  observacoes?: string;
-}
-
 export interface Ticket {
   id: number;
   numero: string;
@@ -59,18 +60,20 @@ export interface TicketAvulso {
 
 export interface PedidoItem {
   id: number;
-  numero_ticket: string;
-  tipo_ticket: "normal" | "avulso";
-  id_ticket?: number;
-  id_ticket_avulso?: number;
-  id_tipo_refeicao: number;
-  nome_funcionario: string;
-  cpf_funcionario: string;
+  tipo: string;
+  tipo_texto: string;
+  entregue: boolean;
+  data_entrega: string | null;
+  funcionario: string | null;
+  cpf: string | null;
+  ticket_numero: string | null;
+  ticket_id: number | null;
   valor_unitario: number;
-  quantidade: number;
-  tipoRefeicao?: TipoRefeicao;
-  ticket?: Ticket;
-  ticketAvulso?: TicketAvulso;
+  valor_formatado: string;
+  status_ticket: number;
+  ticket_entregue: boolean;
+  pode_entregar: boolean;
+  status_ticket_texto: string;
 }
 
 export interface PedidoSimplificado {
@@ -78,68 +81,81 @@ export interface PedidoSimplificado {
   codigo_pedido: string;
   status: number;
   status_texto: string;
+  status_cor: string;
   data_pedido: string;
   data_aceito?: string;
-  data_em_preparo?: string;
   data_pronto?: string;
   data_entregue?: string;
   data_recusado?: string;
   data_cancelado?: string;
-  observacoes?: string;
+  estabelecimento: {
+    id: number;
+    nome: string;
+  };
+  restaurante: {
+    id: number;
+    nome: string;
+  };
+  tipo_refeicao: string;
   quantidade_total: number;
+  quantidade_normal: number;
+  quantidade_avulsa: number;
   valor_total: string;
-  estabelecimento: Estabelecimento;
-  restaurante: Restaurante;
-  solicitante: Usuario;
   total_itens: number;
-  motivo_recusa?: string;
-  metodo_entrega?: "qr_code" | "codigo_manual";
-  qr_code_usado_em?: string;
+  observacoes?: string;
+  solicitante?: {
+    nome: string;
+  };
 }
 
-export interface Pedido extends PedidoSimplificado {
-  usuarioSolicitante: Usuario;
-  usuarioAceito?: Usuario;
-  usuarioEmPreparo?: Usuario;
-  usuarioRecusado?: Usuario;
-  usuarioPronto?: Usuario;
-  usuarioEntregue?: Usuario;
-  usuarioCancelado?: Usuario;
+export interface Pedido {
+  id: number;
+  codigo_pedido: string;
+  status: number;
+  status_texto: string;
+  status_cor: string;
+  estabelecimento: {
+    id: number;
+    nome: string;
+  };
+  restaurante: {
+    id: number;
+    nome: string;
+    logradouro?: string;
+  };
+  tipo_refeicao: string;
+  quantidade_total: number;
+  quantidade_normal: number;
+  quantidade_avulsa: number;
+  itens_entregues: number;
+  itens_pendentes: number;
+  valor_total: number;
+  valor_total_formatado: string;
+  observacoes?: string;
+  data_pedido: string;
+  data_aceito?: string;
+  data_pronto?: string;
+  data_entregue?: string;
+  tempo_decorrido: string;
+  solicitante: string;
+  total_itens: number;
   itensPedido: PedidoItem[];
-  qr_code_data?: string;
 }
 
 export interface CriarPedidoRequest {
   id_restaurante: number;
-  tickets: string[];
+  id_tipo_refeicao: number;
+  quantidade_normal?: number;
+  quantidade_avulsa?: number;
   observacoes?: string;
 }
 
 export const TIPOS_REFEICAO = {
-  1: "Café",
+  1: "Café da Manhã",
   2: "Lanche",
   3: "Almoço",
   4: "Jantar",
 } as const;
-
-export interface BuscarTicketsRequest {
-  numeros_tickets: string[];
-  id_restaurante: number;
-}
-
-export interface TicketDisponivel {
-  numero: string;
-  tipo: "normal" | "avulso";
-  encontrado: boolean;
-  ticket_id?: number;
-  empresa_id?: number;
-  funcionario_nome?: string;
-  funcionario_cpf?: string;
-  tipo_refeicao?: string;
-  valor?: number;
-  valor_formatado?: string;
-  erro?: string;
-}
 
 export interface PedidosFilters {
   status?: number;
@@ -147,9 +163,8 @@ export interface PedidosFilters {
   data_fim?: string;
   id_restaurante?: number;
   id_estabelecimento?: number;
+  id_tipo_refeicao?: number;
   codigo_pedido?: string;
-  apenas_hoje?: boolean;
-  apenas_pendentes?: boolean;
   per_page?: number;
   page?: number;
 }
@@ -173,6 +188,26 @@ export interface PedidoResponse {
   success: boolean;
   message?: string;
   pedido: Pedido;
+  quota_restante?: number;
+}
+
+export interface CriarPedidoResponse {
+  success: boolean;
+  message: string;
+  pedido: {
+    id: number;
+    codigo_pedido: string;
+    status: number;
+    status_texto: string;
+    quantidade_total: number;
+    quantidade_normal: number;
+    quantidade_avulsa: number;
+    valor_total: number;
+    valor_total_formatado: string;
+    tipo_refeicao: string;
+    data_pedido: string;
+  };
+  quota_restante: number;
 }
 
 export interface QRCodeResponse {
@@ -190,8 +225,21 @@ export interface QRScanResponse {
   qr_valido?: boolean;
 }
 
+export interface EntregarItemFuncionarioRequest {
+  funcionario_id: number;
+  liberacao_id: number;
+}
+
+export interface EntregarItemAvulsoRequest {
+  nome: string;
+  cpf?: string;
+  numero_ticket?: string;
+  observacao?: string;
+}
+
 export const PEDIDO_STATUS = {
   PENDENTE: 1,
+  ACEITO: 2,
   EM_PREPARO: 3,
   PRONTO: 4,
   ENTREGUE: 5,
@@ -201,6 +249,7 @@ export const PEDIDO_STATUS = {
 
 export const STATUS_LABELS = {
   [PEDIDO_STATUS.PENDENTE]: "Pendente",
+  [PEDIDO_STATUS.ACEITO]: "Aceito",
   [PEDIDO_STATUS.EM_PREPARO]: "Em Preparo",
   [PEDIDO_STATUS.PRONTO]: "Pronto",
   [PEDIDO_STATUS.ENTREGUE]: "Entregue",
@@ -210,6 +259,7 @@ export const STATUS_LABELS = {
 
 export const PEDIDO_STATUS_TEXTO = {
   1: "Pendente",
+  2: "Aceito",
   3: "Em Preparo",
   4: "Pronto",
   5: "Entregue",
