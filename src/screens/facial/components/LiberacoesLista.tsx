@@ -29,6 +29,7 @@ interface Props {
   onConsumirLiberacao: (liberacaoId: number) => void;
   isConsuming: boolean;
   consumingId?: number;
+  modoPedido?: boolean; // NOVO - indica se está em modo de entrega de pedido
 }
 
 export const LiberacoesLista: React.FC<Props> = ({
@@ -38,6 +39,7 @@ export const LiberacoesLista: React.FC<Props> = ({
   onConsumirLiberacao,
   isConsuming,
   consumingId,
+  modoPedido = false, // NOVO - padrão false
 }) => {
   const getTipoRefeicaoIcon = (tipoId: number) => {
     switch (tipoId) {
@@ -80,7 +82,9 @@ export const LiberacoesLista: React.FC<Props> = ({
           />
           <Text style={styles.emptyTitle}>Nenhuma liberação disponível</Text>
           <Text style={styles.emptySubtitle}>
-            Este funcionário não possui liberações ativas no momento
+            {modoPedido
+              ? "Este funcionário não possui liberações ativas para este tipo de refeição"
+              : "Este funcionário não possui liberações ativas no momento"}
           </Text>
         </Card>
       </View>
@@ -103,11 +107,21 @@ export const LiberacoesLista: React.FC<Props> = ({
             <Text style={styles.funcionarioCpf}>CPF: {funcionarioCpf}</Text>
           </View>
         </View>
+
+        {/* Badge de sucesso */}
+        <View style={styles.sucessoBadge}>
+          <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+          <Text style={styles.sucessoText}>Identificado com sucesso</Text>
+        </View>
       </Card>
 
       {/* Título da Seção */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Liberações Disponíveis</Text>
+        <Text style={styles.sectionTitle}>
+          {modoPedido
+            ? "Selecione a liberação para entregar"
+            : "Liberações Disponíveis"}
+        </Text>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{liberacoes.length}</Text>
         </View>
@@ -120,6 +134,11 @@ export const LiberacoesLista: React.FC<Props> = ({
 
         return (
           <Card key={liberacao.id} style={styles.liberacaoCard}>
+            {/* Borda lateral colorida */}
+            <View
+              style={[styles.bordaLateral, { backgroundColor: tipoColor }]}
+            />
+
             {/* Header da Liberação */}
             <View style={styles.liberacaoHeader}>
               <View
@@ -130,7 +149,7 @@ export const LiberacoesLista: React.FC<Props> = ({
               >
                 <Ionicons
                   name={getTipoRefeicaoIcon(liberacao.tipo_refeicao.id) as any}
-                  size={24}
+                  size={28}
                   color={tipoColor}
                 />
               </View>
@@ -151,10 +170,11 @@ export const LiberacoesLista: React.FC<Props> = ({
               </View>
             </View>
 
-            {/* Botão Consumir */}
+            {/* Botão Consumir/Entregar */}
             <TouchableOpacity
               style={[
                 styles.consumirButton,
+                { backgroundColor: tipoColor },
                 isConsumingThis && styles.consumirButtonDisabled,
               ]}
               onPress={() => onConsumirLiberacao(liberacao.id)}
@@ -163,12 +183,20 @@ export const LiberacoesLista: React.FC<Props> = ({
               {isConsumingThis ? (
                 <View style={styles.consumirButtonContent}>
                   <ActivityIndicator size="small" color="#ffffff" />
-                  <Text style={styles.consumirButtonText}>Processando...</Text>
+                  <Text style={styles.consumirButtonText}>
+                    {modoPedido ? "Entregando..." : "Processando..."}
+                  </Text>
                 </View>
               ) : (
                 <View style={styles.consumirButtonContent}>
-                  <Ionicons name="checkmark-circle" size={20} color="#ffffff" />
-                  <Text style={styles.consumirButtonText}>Consumir</Text>
+                  <Ionicons
+                    name={modoPedido ? "checkmark-done" : "checkmark-circle"}
+                    size={20}
+                    color="#ffffff"
+                  />
+                  <Text style={styles.consumirButtonText}>
+                    {modoPedido ? "Entregar Item" : "Consumir Ticket"}
+                  </Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -176,17 +204,22 @@ export const LiberacoesLista: React.FC<Props> = ({
         );
       })}
 
-      {/* Rodapé */}
-      <View style={styles.footer}>
-        <Ionicons
-          name="information-circle-outline"
-          size={16}
-          color={colors.muted.light}
-        />
-        <Text style={styles.footerText}>
-          Selecione uma liberação para gerar o ticket
+      {/* Rodapé com informação */}
+      <Card style={styles.infoCard}>
+        <View style={styles.infoHeader}>
+          <Ionicons
+            name="information-circle"
+            size={20}
+            color={colors.primary}
+          />
+          <Text style={styles.infoTitle}>Informação</Text>
+        </View>
+        <Text style={styles.infoText}>
+          {modoPedido
+            ? "Selecione uma liberação para entregar o item do pedido. O ticket será gerado e vinculado automaticamente ao item."
+            : "Selecione uma liberação para gerar um ticket de refeição. O ticket será consumido imediatamente."}
         </Text>
-      </View>
+      </Card>
     </ScrollView>
   );
 };
@@ -220,6 +253,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted.light,
     textAlign: "center",
+    lineHeight: 20,
   },
   funcionarioCard: {
     padding: 16,
@@ -229,6 +263,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
+    marginBottom: 12,
   },
   funcionarioIconContainer: {
     width: 56,
@@ -251,6 +286,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted.light,
   },
+  sucessoBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: colors.success + "10",
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  sucessoText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.success,
+  },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -261,12 +311,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: colors.text.light,
+    flex: 1,
   },
   badge: {
     backgroundColor: colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
+    minWidth: 32,
+    alignItems: "center",
   },
   badgeText: {
     fontSize: 14,
@@ -276,6 +329,19 @@ const styles = StyleSheet.create({
   liberacaoCard: {
     padding: 16,
     marginBottom: 12,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    overflow: "hidden", // Importante para a borda lateral
+  },
+  bordaLateral: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
   },
   liberacaoHeader: {
     flexDirection: "row",
@@ -284,9 +350,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   tipoIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -297,7 +363,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: colors.text.light,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   dataContainer: {
     flexDirection: "row",
@@ -305,18 +371,23 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dataText: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.muted.light,
   },
   consumirButton: {
-    backgroundColor: colors.primary,
     borderRadius: 8,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     alignItems: "center",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
   },
   consumirButtonDisabled: {
     backgroundColor: colors.muted.light,
+    opacity: 0.6,
   },
   consumirButtonContent: {
     flexDirection: "row",
@@ -328,16 +399,27 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#ffffff",
   },
-  footer: {
+  infoCard: {
+    padding: 16,
+    marginTop: 8,
+    backgroundColor: colors.primary + "05",
+    borderWidth: 1,
+    borderColor: colors.primary + "20",
+  },
+  infoHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    marginTop: 16,
-    padding: 16,
+    marginBottom: 8,
   },
-  footerText: {
-    fontSize: 12,
-    color: colors.muted.light,
+  infoTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.primary,
+  },
+  infoText: {
+    fontSize: 14,
+    color: colors.text.light,
+    lineHeight: 20,
   },
 });

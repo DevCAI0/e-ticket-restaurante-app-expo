@@ -298,18 +298,6 @@ export function PedidoDetalhesScreen({
                 </Text>
               </View>
             </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <Ionicons name="cash" size={20} color={colors.muted.light} />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Valor Total</Text>
-                <Text style={styles.infoValue}>
-                  {pedido.valor_total_formatado}
-                </Text>
-              </View>
-            </View>
           </View>
 
           {pedido.observacoes && (

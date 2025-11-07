@@ -12,25 +12,21 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { Pedido, PedidoItem } from "../../types/pedidos";
 import { PedidosAPI } from "../../api/pedidos";
 import { showSuccessToast, showErrorToast } from "../../lib/toast";
 import { colors } from "../../constants/colors";
 
-interface EntregarItensScreenProps {
-  route: {
-    params: {
-      pedidoId: number;
-    };
-  };
-  navigation: any;
+interface RouteParams {
+  pedidoId: number;
 }
 
-export function EntregarItensScreen({
-  route,
-  navigation,
-}: EntregarItensScreenProps) {
-  const { pedidoId } = route.params;
+export function EntregarItensScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const { pedidoId } = route.params as RouteParams;
+
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<"normal" | "avulso">("normal");
@@ -62,8 +58,9 @@ export function EntregarItensScreen({
   };
 
   const handleScanFace = (item: PedidoItem) => {
-    // Navegar para tela de reconhecimento facial
-    navigation.navigate("FacialRecognition", {
+    // Navegar para tela de reconhecimento facial em modo pedido
+    navigation.navigate("BiometricApproval", {
+      mode: "pedido",
       pedidoId,
       itemId: item.id,
       onSuccess: () => {
@@ -156,6 +153,7 @@ export function EntregarItensScreen({
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -451,6 +449,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 48,
+    minHeight: 400,
   },
   emptyText: {
     marginTop: 16,
@@ -475,6 +474,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 2,
     borderColor: colors.border.light,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   itemCardSelected: {
     borderColor: colors.primary,

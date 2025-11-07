@@ -56,14 +56,13 @@ export function PedidosHeader({
 
   return (
     <View style={styles.container}>
-      {/* Top Bar com Logo, Título e Ações */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
           <View style={styles.logoContainer}>
             <Ionicons name="receipt" size={24} color={colors.primary} />
           </View>
           <View>
-            <Text style={styles.title}>Pedidos</Text>
+            <Text style={styles.title}>Pedidos1</Text>
             <Text style={styles.subtitle}>
               {isEstabelecimento && "Estabelecimento"}
               {isRestaurante && "Restaurante"}
@@ -71,23 +70,13 @@ export function PedidosHeader({
           </View>
         </View>
 
-        <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons
-              name="person-circle-outline"
-              size={28}
-              color={colors.text.light}
-            />
+        {isEstabelecimento && (
+          <TouchableOpacity style={styles.createButton} onPress={onCreateNew}>
+            <Ionicons name="add" size={24} color={colors.primary} />
           </TouchableOpacity>
-          {isEstabelecimento && (
-            <TouchableOpacity style={styles.createButton} onPress={onCreateNew}>
-              <Ionicons name="add" size={24} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-        </View>
+        )}
       </View>
 
-      {/* Search Bar */}
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color={colors.muted.light} />
         <TextInput
@@ -99,7 +88,6 @@ export function PedidosHeader({
         />
       </View>
 
-      {/* Filter Tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -127,7 +115,6 @@ export function PedidosHeader({
         ))}
       </ScrollView>
 
-      {/* Count Summary */}
       <View style={styles.summaryContainer}>
         <Text style={styles.summaryText}>
           {pedidos.length} de {totalCount} pedido{totalCount !== 1 ? "s" : ""}
@@ -174,17 +161,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted.light,
     marginTop: 2,
-  },
-  topBarRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
   },
   createButton: {
     width: 40,

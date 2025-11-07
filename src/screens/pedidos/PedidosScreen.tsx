@@ -10,7 +10,6 @@ import {
   StyleSheet,
   StatusBar,
   Alert,
-  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +24,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useProfilePermissions } from "../../hooks/useProfilePermissions";
 import { showSuccessToast, showErrorToast } from "../../lib/toast";
 import { PedidoCard } from "./components/PedidoCard";
+import { PedidosHeader } from "./components/PedidosHeader";
 import { colors } from "../../constants/colors";
 import { BottomNav } from "../../components/common/BottomNav";
 import { usePedidosPendentes } from "../../hooks/usePedidosPendentes";
@@ -437,70 +437,6 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
     );
   };
 
-  const renderHeader = () => {
-    const filters_tabs = [
-      { value: "all", label: "Todos" },
-      { value: "today", label: "Hoje" },
-    ];
-
-    if (isEstabelecimento) {
-      filters_tabs.push(
-        { value: "1", label: "Pendentes" },
-        { value: "4", label: "Prontos" },
-        { value: "5", label: "Entregues" }
-      );
-    } else if (isRestaurante) {
-      filters_tabs.push(
-        { value: "1", label: "Pendentes" },
-        { value: "2", label: "Aceitos" },
-        { value: "3", label: "Em Preparo" },
-        { value: "4", label: "Prontos" },
-        { value: "5", label: "Entregues" }
-      );
-    }
-
-    return (
-      <View style={styles.headerContainer}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={colors.muted.light} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar pedido..."
-            placeholderTextColor={colors.muted.light}
-            value={searchTerm}
-            onChangeText={handleSearchChange}
-          />
-        </View>
-
-        <View style={styles.filterTabsContainer}>
-          {filters_tabs.map((filter) => (
-            <TouchableOpacity
-              key={filter.value}
-              style={[
-                styles.filterTab,
-                selectedStatus === filter.value && styles.filterTabActive,
-              ]}
-              onPress={() => handleStatusChange(filter.value)}
-            >
-              <Text
-                style={[
-                  styles.filterTabText,
-                  selectedStatus === filter.value && styles.filterTabTextActive,
-                ]}
-              >
-                {filter.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.countText}>
-          {pedidos.length} de {totalCount} pedidos
-        </Text>
-      </View>
-    );
-  };
-
   if (loading && pedidos.length === 0) {
     return (
       <SafeAreaView style={styles.container}>
@@ -516,50 +452,22 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <StatusBar barStyle="dark-content" />
 
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="receipt" size={24} color={colors.primary} />
-          </View>
-          <View>
-            <Text style={styles.title}>Pedidos</Text>
-            <Text style={styles.subtitle}>
-              {isEstabelecimento ? "Estabelecimento" : "Restaurante"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.topBarRight}>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons
-              name="sunny-outline"
-              size={24}
-              color={colors.text.light}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton}>
-            <Ionicons
-              name="person-circle-outline"
-              size={24}
-              color={colors.text.light}
-            />
-          </TouchableOpacity>
-          {isEstabelecimento && (
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={handleCreateNew}
-            >
-              <Ionicons name="add" size={24} color={colors.primary} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      <PedidosHeader
+        isEstabelecimento={isEstabelecimento}
+        isRestaurante={isRestaurante}
+        searchTerm={searchTerm}
+        selectedStatus={selectedStatus}
+        totalCount={totalCount}
+        pedidos={pedidos}
+        onCreateNew={handleCreateNew}
+        onSearchChange={handleSearchChange}
+        onStatusChange={handleStatusChange}
+      />
 
       <FlatList
         data={pedidos}
         renderItem={renderPedido}
         keyExtractor={(item) => `${item.id}-${item.codigo_pedido}`}
-        ListHeaderComponent={renderHeader}
         contentContainerStyle={[
           styles.listContent,
           pedidos.length === 0 && styles.listContentEmpty,
@@ -599,110 +507,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.card.light,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  topBarLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  logoContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: colors.primary + "15",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text.light,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: colors.muted.light,
-    marginTop: 2,
-  },
-  topBarRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  iconButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerContainer: {
-    padding: 16,
-    backgroundColor: colors.background.light,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.border.light,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text.light,
-  },
-  filterTabsContainer: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 12,
-    flexWrap: "wrap",
-  },
-  filterTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.border.light,
-  },
-  filterTabActive: {
-    backgroundColor: colors.primary + "15",
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  filterTabText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: colors.text.light,
-  },
-  filterTabTextActive: {
-    color: colors.primary,
-    fontWeight: "600",
-  },
-  countText: {
-    fontSize: 12,
-    color: colors.muted.light,
-  },
   listContent: {
     paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 16,
   },
   listContentEmpty: {

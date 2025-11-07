@@ -114,6 +114,11 @@ export interface Pedido {
   status: number;
   status_texto: string;
   status_cor: string;
+  // ✅ IDs diretos para facilitar acesso (vindos do backend)
+  id_restaurante: number;
+  id_estabelecimento: number;
+  id_tipo_refeicao: number;
+  // Objetos aninhados para compatibilidade
   estabelecimento: {
     id: number;
     nome: string;
