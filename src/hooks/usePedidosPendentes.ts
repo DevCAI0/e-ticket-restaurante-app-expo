@@ -1,7 +1,7 @@
 // src/hooks/usePedidosPendentes.ts
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./useAuth";
-import { listarPedidos } from "../api/pedidos";
+import { PedidosAPI } from "../api/pedidos";
 
 export function usePedidosPendentes() {
   const { user, isAuthenticated } = useAuth();
@@ -12,6 +12,7 @@ export function usePedidosPendentes() {
   // Refs para evitar loops infinitos
   const isMounted = useRef(true);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCountRef = useRef(0); // ✅ Usar ref ao invés de state no useCallback
 
   const checkPedidosPendentes = useCallback(async () => {
     if (!isAuthenticated() || !user) {
@@ -21,7 +22,7 @@ export function usePedidosPendentes() {
     }
 
     try {
-      const response = await listarPedidos({
+      const response = await PedidosAPI.listarPedidos({
         status: 1, // PEDIDO_STATUS.PENDENTE = 1
         per_page: 100,
       });
@@ -30,17 +31,19 @@ export function usePedidosPendentes() {
         const pendentesCount = response.pedidos.length;
 
         // Se houver mais pedidos que antes, marca como "novos"
-        if (lastCheck && pendentesCount > count) {
+        if (pendentesCount > lastCountRef.current) {
           setHasNewOrders(true);
         }
 
+        lastCountRef.current = pendentesCount;
         setCount(pendentesCount);
         setLastCheck(new Date());
       }
     } catch (error) {
       console.error("Erro ao verificar pedidos pendentes:", error);
+      // ✅ Não fazer nada em caso de erro - manter contadores
     }
-  }, [isAuthenticated, user]); // ❌ REMOVIDO count e lastCheck das dependências
+  }, [isAuthenticated, user]);
 
   // Verifica a cada 30 segundos
   useEffect(() => {
@@ -49,7 +52,7 @@ export function usePedidosPendentes() {
       clearInterval(intervalRef.current);
     }
 
-    if (isAuthenticated()) {
+    if (isAuthenticated() && user) {
       // Primeira verificação
       checkPedidosPendentes();
 
@@ -57,6 +60,11 @@ export function usePedidosPendentes() {
       intervalRef.current = setInterval(() => {
         checkPedidosPendentes();
       }, 30000); // 30 segundos
+    } else {
+      // Se não autenticado, zerar contadores
+      setCount(0);
+      setHasNewOrders(false);
+      lastCountRef.current = 0;
     }
 
     // Cleanup
@@ -65,7 +73,7 @@ export function usePedidosPendentes() {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isAuthenticated]); // ❌ REMOVIDO checkPedidosPendentes das dependências
+  }, [isAuthenticated, user, checkPedidosPendentes]);
 
   // Cleanup no unmount
   useEffect(() => {

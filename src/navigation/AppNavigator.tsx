@@ -1,4 +1,4 @@
-// src/navigation/AppNavigator.tsx - Atualizado com permissões
+// src/navigation/AppNavigator.tsx
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -12,6 +12,12 @@ import { BiometricApprovalScreen } from "../screens/facial/BiometricApprovalScre
 import { PedidosScreen } from "../screens/pedidos/PedidosScreen";
 import { PedidoDetalhesScreen } from "../screens/pedidos/PedidoDetalhesScreen";
 import { CriarPedidoScreen } from "../screens/pedidos/components/CriarPedidoScreen";
+import { RecusarPedidoScreen } from "../screens/pedidos/components/RecusarPedidoScreen";
+import { CancelarPedidoScreen } from "../screens/pedidos/components/CancelarPedidoScreen";
+import { QRCodeScreen } from "../screens/pedidos/QRCodeScreen";
+import { QRScannerScreen } from "../screens/pedidos/QRScannerScreen";
+import { EntregarItensScreen } from "../screens/pedidos/EntregarItensScreen";
+// import { FacialRecognitionScreen } from "../screens/pedidos/FacialRecognitionScreen";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { colors } from "../constants/colors";
 import { routes } from "./routes";
@@ -43,8 +49,13 @@ export type RootStackParamList = {
   QRScanner: {
     pedido: PedidoSimplificado;
   };
-  EntregarFuncionario: {
-    pedido: PedidoSimplificado;
+  EntregarItens: {
+    pedidoId: number;
+  };
+  FacialRecognition: {
+    pedidoId: number;
+    itemId: number;
+    onSuccess: () => void;
   };
 };
 
@@ -74,14 +85,12 @@ export const AppNavigator: React.FC = () => {
       >
         {user ? (
           <>
-            {/* Home - Todos têm acesso */}
-            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name={routes.HOME} component={HomeScreen} />
 
-            {/* Tickets Routes - Apenas para usuários com permissão */}
             {canAccessTickets() && (
               <>
                 <Stack.Screen
-                  name="Scanner"
+                  name={routes.SCANNER}
                   component={ScannerScreen}
                   options={{
                     presentation: "fullScreenModal",
@@ -89,11 +98,11 @@ export const AppNavigator: React.FC = () => {
                   }}
                 />
                 <Stack.Screen
-                  name="ManualVerification"
+                  name={routes.MANUAL_VERIFICATION}
                   component={ManualVerificationScreen}
                 />
                 <Stack.Screen
-                  name="BiometricApproval"
+                  name={routes.BIOMETRIC_APPROVAL}
                   component={BiometricApprovalScreen}
                   options={{
                     presentation: "modal",
@@ -103,28 +112,70 @@ export const AppNavigator: React.FC = () => {
               </>
             )}
 
-            {/* Pedidos Routes - Apenas para usuários com permissão */}
             {canAccessOrders() && (
               <>
-                <Stack.Screen name="Pedidos" component={PedidosScreen} />
+                <Stack.Screen name={routes.PEDIDOS} component={PedidosScreen} />
                 <Stack.Screen
-                  name="PedidoDetalhes"
+                  name={routes.PEDIDO_DETALHES}
                   component={PedidoDetalhesScreen}
                 />
                 <Stack.Screen
-                  name="CriarPedido"
+                  name={routes.CRIAR_PEDIDO}
                   component={CriarPedidoScreen}
                   options={{
                     presentation: "modal",
                     animation: "slide_from_bottom",
                   }}
                 />
-                {/* TODO: Adicionar as outras telas de pedidos quando estiverem prontas */}
+                <Stack.Screen
+                  name={routes.RECUSAR_PEDIDO}
+                  component={RecusarPedidoScreen}
+                  options={{
+                    presentation: "modal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                <Stack.Screen
+                  name={routes.CANCELAR_PEDIDO}
+                  component={CancelarPedidoScreen}
+                  options={{
+                    presentation: "modal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                <Stack.Screen
+                  name={routes.QR_CODE}
+                  component={QRCodeScreen}
+                  options={{
+                    presentation: "modal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                <Stack.Screen
+                  name={routes.QR_SCANNER}
+                  component={QRScannerScreen}
+                  options={{
+                    presentation: "fullScreenModal",
+                    animation: "slide_from_bottom",
+                  }}
+                />
+                <Stack.Screen
+                  name={routes.ENTREGAR_ITENS}
+                  component={EntregarItensScreen}
+                />
+                {/* <Stack.Screen
+                  name={routes.FACIAL_RECOGNITION}
+                  component={FacialRecognitionScreen}
+                  options={{
+                    presentation: "fullScreenModal",
+                    animation: "slide_from_bottom",
+                  }}
+                /> */}
               </>
             )}
           </>
         ) : (
-          <Stack.Screen name="SignIn" component={SignInScreen} />
+          <Stack.Screen name={routes.SIGN_IN} component={SignInScreen} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

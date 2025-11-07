@@ -1,21 +1,11 @@
 // src/navigation/routes.ts
-
 export const routes = {
-  // Auth Routes
   SIGN_IN: "SignIn",
-
-  // Main Routes
   HOME: "Home",
-
-  // Ticket Routes
   SCANNER: "Scanner",
   MANUAL_VERIFICATION: "ManualVerification",
   TICKET_DETAILS: "TicketDetails",
-
-  // Biometric Routes
   BIOMETRIC_APPROVAL: "BiometricApproval",
-
-  // Pedidos Routes
   PEDIDOS: "Pedidos",
   PEDIDO_DETALHES: "PedidoDetalhes",
   CRIAR_PEDIDO: "CriarPedido",
@@ -24,9 +14,8 @@ export const routes = {
   CANCELAR_PEDIDO: "CancelarPedido",
   QR_CODE: "QRCode",
   QR_SCANNER: "QRScanner",
-  ENTREGAR_FUNCIONARIO: "EntregarFuncionario",
-
-  // Other Routes
+  ENTREGAR_ITENS: "EntregarItens",
+  FACIAL_RECOGNITION: "FacialRecognition",
   ORDERS: "Orders",
   SETTINGS: "Settings",
 } as const;

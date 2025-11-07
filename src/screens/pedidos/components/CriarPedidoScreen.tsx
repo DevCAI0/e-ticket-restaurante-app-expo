@@ -53,11 +53,9 @@ export function CriarPedidoScreen({
   const [selectedTipoRefeicao, setSelectedTipoRefeicao] =
     useState<TipoRefeicaoDisponivel | null>(null);
 
-  // Modals
   const [showRestauranteModal, setShowRestauranteModal] = useState(false);
   const [showTipoRefeicaoModal, setShowTipoRefeicaoModal] = useState(false);
 
-  // Quantidades
   const [quantidadeNormal, setQuantidadeNormal] = useState("");
   const [quantidadeAvulsa, setQuantidadeAvulsa] = useState("");
   const [observacoes, setObservacoes] = useState("");
@@ -222,7 +220,7 @@ export function CriarPedidoScreen({
                   ]}
                   onPress={() => {
                     setSelectedRestaurante(restaurante);
-                    setSelectedTipoRefeicao(null); // Reset tipo refeição
+                    setSelectedTipoRefeicao(null);
                     setShowRestauranteModal(false);
                   }}
                 >
@@ -333,7 +331,6 @@ export function CriarPedidoScreen({
                         </Text>
                       </View>
 
-                      {/* Barra de progresso */}
                       <View style={styles.quotaBar}>
                         <View
                           style={[
@@ -374,7 +371,7 @@ export function CriarPedidoScreen({
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -391,7 +388,6 @@ export function CriarPedidoScreen({
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Estabelecimento Info */}
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>
             {user?.nome_estabelecimento || "ESTABELECIMENTO"}
@@ -402,7 +398,6 @@ export function CriarPedidoScreen({
           </Text>
         </View>
 
-        {/* Restaurante Selection */}
         <View style={styles.section}>
           <Text style={styles.label}>
             Restaurante <Text style={styles.required}>*</Text>
@@ -434,7 +429,6 @@ export function CriarPedidoScreen({
           </TouchableOpacity>
         </View>
 
-        {/* Tipo de Refeição Selection */}
         {selectedRestaurante && (
           <View style={styles.section}>
             <Text style={styles.label}>
@@ -470,14 +464,12 @@ export function CriarPedidoScreen({
           </View>
         )}
 
-        {/* Quantidade Section */}
         {selectedTipoRefeicao && (
           <View style={styles.section}>
             <Text style={styles.label}>
               Quantidade de Tickets <Text style={styles.required}>*</Text>
             </Text>
 
-            {/* Tickets Normais */}
             <View style={styles.quantidadeCard}>
               <View style={styles.quantidadeHeader}>
                 <Ionicons name="person" size={20} color={colors.primary} />
@@ -500,7 +492,6 @@ export function CriarPedidoScreen({
               />
             </View>
 
-            {/* Tickets Avulsos */}
             <View style={styles.quantidadeCard}>
               <View style={styles.quantidadeHeader}>
                 <Ionicons name="people" size={20} color={colors.info} />
@@ -523,7 +514,6 @@ export function CriarPedidoScreen({
               />
             </View>
 
-            {/* Resumo */}
             {getQuantidadeTotal() > 0 && (
               <View style={styles.resumoCard}>
                 <View style={styles.resumoRow}>
@@ -544,7 +534,6 @@ export function CriarPedidoScreen({
                   </Text>
                 </View>
 
-                {/* Aviso de quota */}
                 {getQuantidadeTotal() >
                   selectedTipoRefeicao.quota_disponivel && (
                   <View style={styles.warningBox}>
@@ -560,7 +549,6 @@ export function CriarPedidoScreen({
           </View>
         )}
 
-        {/* Observações */}
         <View style={styles.section}>
           <Text style={styles.label}>Observações Gerais</Text>
           <TextInput
@@ -579,7 +567,6 @@ export function CriarPedidoScreen({
         </View>
       </ScrollView>
 
-      {/* Footer Buttons */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.cancelButton}
@@ -653,6 +640,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
   infoCard: {
     backgroundColor: colors.primary + "15",

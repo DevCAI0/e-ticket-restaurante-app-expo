@@ -96,16 +96,16 @@ export interface PedidoSimplificado {
     id: number;
     nome: string;
   };
+  solicitante: {
+    id: number;
+    nome: string;
+  };
   tipo_refeicao: string;
   quantidade_total: number;
   quantidade_normal: number;
   quantidade_avulsa: number;
-  valor_total: string;
   total_itens: number;
   observacoes?: string;
-  solicitante?: {
-    nome: string;
-  };
 }
 
 export interface Pedido {
@@ -223,6 +223,7 @@ export interface QRScanResponse {
   message: string;
   pedido?: Pedido;
   qr_valido?: boolean;
+  error?: string;
 }
 
 export interface EntregarItemFuncionarioRequest {

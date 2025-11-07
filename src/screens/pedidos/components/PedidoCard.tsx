@@ -24,6 +24,7 @@ interface PedidoCardProps {
   onMarkReady: () => void;
   onShowQRCode: () => void;
   onScanQRCode: () => void;
+  onEntregarItens?: () => void;
 }
 
 export function PedidoCard({
@@ -39,6 +40,7 @@ export function PedidoCard({
   onMarkReady,
   onShowQRCode,
   onScanQRCode,
+  onEntregarItens,
 }: PedidoCardProps) {
   const getStatusConfig = (status: number) => {
     switch (status) {
@@ -49,6 +51,14 @@ export function PedidoCard({
           textColor: colors.warning,
           icon: "time-outline" as const,
           label: "Pendente",
+        };
+      case 2:
+        return {
+          color: colors.info,
+          bgColor: colors.info + "15",
+          textColor: colors.info,
+          icon: "checkmark-outline" as const,
+          label: "Aceito",
         };
       case 3:
         return {
@@ -118,110 +128,151 @@ export function PedidoCard({
     }
   };
 
+  // ✅ Extrair dados com verificações de segurança
+  const nomeExibicao =
+    userType === "estabelecimento"
+      ? pedido.restaurante?.nome || "Restaurante"
+      : pedido.estabelecimento?.nome || "Estabelecimento";
+
+  const nomeSolicitante = pedido.solicitante?.nome || "Não informado";
+  const totalItens = pedido.total_itens || 0;
+
+  // ✅ CORREÇÃO: Extrair apenas o número do código do pedido
+  const numeroPedido = pedido.codigo_pedido
+    ? pedido.codigo_pedido.replace(/[^0-9]/g, "")
+    : String(pedido.id || "N/A");
+
+  const dataPedido = pedido.data_pedido || "";
+  const observacoes = pedido.observacoes;
+
   const renderActions = () => {
     const actions = [];
 
-    // Status 1 - Pendente
-    if (pedido.status === 1) {
-      if (userType === "estabelecimento") {
+    // ========== ESTABELECIMENTO ==========
+
+    // Status 1 - Pendente (Estabelecimento)
+    if (pedido.status === 1 && userType === "estabelecimento") {
+      actions.push(
+        <TouchableOpacity
+          key="cancel"
+          style={[styles.actionButton, styles.dangerButton]}
+          onPress={onCancel}
+          disabled={loadingAction === "canceling"}
+        >
+          {loadingAction === "canceling" ? (
+            <ActivityIndicator size="small" color={colors.background.light} />
+          ) : (
+            <>
+              <Ionicons
+                name="trash-outline"
+                size={16}
+                color={colors.background.light}
+              />
+              <Text style={styles.dangerButtonText}>Cancelar</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      );
+    }
+
+    // Status 4 - Pronto (Estabelecimento pode ver QR Code)
+    if (pedido.status === 4 && userType === "estabelecimento") {
+      actions.push(
+        <TouchableOpacity
+          key="qr"
+          style={[styles.actionButton, styles.successButton]}
+          onPress={onShowQRCode}
+        >
+          <Ionicons name="qr-code" size={16} color={colors.background.light} />
+          <Text style={styles.successButtonText}>QR Code</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // Status 5 - Entregue (Estabelecimento pode entregar itens individuais)
+    if (
+      pedido.status === 5 &&
+      userType === "estabelecimento" &&
+      onEntregarItens
+    ) {
+      if (!allTicketsDelivered) {
         actions.push(
           <TouchableOpacity
-            key="add"
+            key="entregar"
             style={[styles.actionButton, styles.primaryButton]}
-            onPress={onAddItems}
-            disabled={loadingAction !== ""}
+            onPress={onEntregarItens}
           >
-            {loadingAction === "adding" ? (
-              <ActivityIndicator size="small" color={colors.background.light} />
-            ) : (
-              <>
-                <Ionicons
-                  name="add"
-                  size={16}
-                  color={colors.background.light}
-                />
-                <Text style={styles.primaryButtonText}>Adicionar</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        );
-
-        actions.push(
-          <TouchableOpacity
-            key="cancel"
-            style={[styles.actionButton, styles.dangerButton]}
-            onPress={onCancel}
-            disabled={loadingAction === "canceling"}
-          >
-            {loadingAction === "canceling" ? (
-              <ActivityIndicator size="small" color={colors.background.light} />
-            ) : (
-              <>
-                <Ionicons
-                  name="trash-outline"
-                  size={16}
-                  color={colors.background.light}
-                />
-                <Text style={styles.dangerButtonText}>Cancelar</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        );
-      }
-
-      if (userType === "restaurante") {
-        actions.push(
-          <TouchableOpacity
-            key="accept"
-            style={[styles.actionButton, styles.successButton]}
-            onPress={onAccept}
-            disabled={loadingAction === "accepting"}
-          >
-            {loadingAction === "accepting" ? (
-              <ActivityIndicator size="small" color={colors.background.light} />
-            ) : (
-              <>
-                <Ionicons
-                  name="checkmark"
-                  size={16}
-                  color={colors.background.light}
-                />
-                <Text style={styles.successButtonText}>Aceitar</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        );
-
-        actions.push(
-          <TouchableOpacity
-            key="reject"
-            style={[styles.actionButton, styles.dangerButton]}
-            onPress={onReject}
-            disabled={loadingAction === "rejecting"}
-          >
-            {loadingAction === "rejecting" ? (
-              <ActivityIndicator size="small" color={colors.background.light} />
-            ) : (
-              <>
-                <Ionicons
-                  name="close"
-                  size={16}
-                  color={colors.background.light}
-                />
-                <Text style={styles.dangerButtonText}>Recusar</Text>
-              </>
-            )}
+            <Ionicons
+              name="person-add"
+              size={16}
+              color={colors.background.light}
+            />
+            <Text style={styles.primaryButtonText}>
+              Entregar ao Funcionário
+            </Text>
           </TouchableOpacity>
         );
       }
     }
 
-    // Status 3 - Em Preparo
-    if (pedido.status === 3 && userType === "restaurante") {
+    // ========== RESTAURANTE ==========
+
+    // Status 1 - Pendente (Restaurante pode aceitar/recusar)
+    if (pedido.status === 1 && userType === "restaurante") {
+      actions.push(
+        <TouchableOpacity
+          key="accept"
+          style={[styles.actionButton, styles.successButton]}
+          onPress={onAccept}
+          disabled={loadingAction === "accepting"}
+        >
+          {loadingAction === "accepting" ? (
+            <ActivityIndicator size="small" color={colors.background.light} />
+          ) : (
+            <>
+              <Ionicons
+                name="checkmark"
+                size={16}
+                color={colors.background.light}
+              />
+              <Text style={styles.successButtonText}>Aceitar</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      );
+
+      actions.push(
+        <TouchableOpacity
+          key="reject"
+          style={[styles.actionButton, styles.dangerButton]}
+          onPress={onReject}
+          disabled={loadingAction === "rejecting"}
+        >
+          {loadingAction === "rejecting" ? (
+            <ActivityIndicator size="small" color={colors.background.light} />
+          ) : (
+            <>
+              <Ionicons
+                name="close"
+                size={16}
+                color={colors.background.light}
+              />
+              <Text style={styles.dangerButtonText}>Recusar</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      );
+    }
+
+    // Status 2 - Aceito ou Status 3 - Em Preparo (Restaurante pode marcar como pronto)
+    if (
+      (pedido.status === 2 || pedido.status === 3) &&
+      userType === "restaurante"
+    ) {
       actions.push(
         <TouchableOpacity
           key="ready"
-          style={[styles.actionButton, styles.warningButton]}
+          style={[styles.actionButton, styles.primaryButton]}
           onPress={onMarkReady}
           disabled={loadingAction === "ready"}
         >
@@ -234,58 +285,39 @@ export function PedidoCard({
                 size={16}
                 color={colors.background.light}
               />
-              <Text style={styles.warningButtonText}>Pronto</Text>
+              <Text style={styles.primaryButtonText}>Marcar Pronto</Text>
             </>
           )}
         </TouchableOpacity>
       );
     }
 
-    // Status 4 - Pronto
-    if (pedido.status === 4) {
-      if (userType === "estabelecimento") {
-        actions.push(
-          <TouchableOpacity
-            key="qr"
-            style={[styles.actionButton, styles.successButton]}
-            onPress={onShowQRCode}
-          >
-            <Ionicons
-              name="qr-code"
-              size={16}
-              color={colors.background.light}
-            />
-            <Text style={styles.successButtonText}>QR Code</Text>
-          </TouchableOpacity>
-        );
-      }
-
-      if (userType === "restaurante") {
-        actions.push(
-          <TouchableOpacity
-            key="scan"
-            style={[styles.actionButton, styles.successButton]}
-            onPress={onScanQRCode}
-            disabled={loadingAction === "delivering"}
-          >
-            {loadingAction === "delivering" ? (
-              <ActivityIndicator size="small" color={colors.background.light} />
-            ) : (
-              <>
-                <Ionicons
-                  name="camera"
-                  size={16}
-                  color={colors.background.light}
-                />
-                <Text style={styles.successButtonText}>Escanear</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        );
-      }
+    // Status 4 - Pronto (Restaurante pode escanear QR Code)
+    if (pedido.status === 4 && userType === "restaurante") {
+      actions.push(
+        <TouchableOpacity
+          key="scan"
+          style={[styles.actionButton, styles.successButton]}
+          onPress={onScanQRCode}
+          disabled={loadingAction === "delivering"}
+        >
+          {loadingAction === "delivering" ? (
+            <ActivityIndicator size="small" color={colors.background.light} />
+          ) : (
+            <>
+              <Ionicons
+                name="camera"
+                size={16}
+                color={colors.background.light}
+              />
+              <Text style={styles.successButtonText}>Escanear</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      );
     }
 
-    // Botão Ver Detalhes sempre presente
+    // ========== BOTÃO DETALHES (SEMPRE) ==========
     actions.unshift(
       <TouchableOpacity
         key="details"
@@ -307,7 +339,7 @@ export function PedidoCard({
           <View
             style={[styles.statusDot, { backgroundColor: statusConfig.color }]}
           />
-          <Text style={styles.code}>#{pedido.codigo_pedido}</Text>
+          <Text style={styles.code}>#{numeroPedido}</Text>
         </View>
         <View
           style={[
@@ -323,16 +355,14 @@ export function PedidoCard({
 
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={2}>
-          {userType === "estabelecimento"
-            ? pedido.restaurante.nome
-            : pedido.estabelecimento.nome}
+          {nomeExibicao}
         </Text>
 
         <View style={styles.info}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoText}>{pedido.solicitante.nome}</Text>
+            <Text style={styles.infoText}>{nomeSolicitante}</Text>
             <Text style={styles.infoText}>
-              {pedido.total_itens} ticket{pedido.total_itens !== 1 ? "s" : ""}
+              {totalItens} ticket{totalItens !== 1 ? "s" : ""}
             </Text>
           </View>
           <View style={styles.timeRow}>
@@ -342,15 +372,15 @@ export function PedidoCard({
               color={colors.muted.light}
             />
             <Text style={styles.timeText}>
-              {formatTime(pedido.data_pedido)}
+              {dataPedido ? formatTime(dataPedido) : "N/A"}
             </Text>
           </View>
         </View>
 
-        {pedido.observacoes && (
+        {observacoes && (
           <View style={styles.observationsContainer}>
             <Text style={styles.observationsText} numberOfLines={2}>
-              {pedido.observacoes}
+              {observacoes}
             </Text>
           </View>
         )}
@@ -403,8 +433,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   code: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 14,
+    fontWeight: "700",
     color: colors.primary,
   },
   statusBadge: {
@@ -471,13 +501,16 @@ const styles = StyleSheet.create({
   deliveredText: {
     fontSize: 11,
     color: colors.success,
+    fontWeight: "500",
   },
   actionsContainer: {
     flexDirection: "row",
     gap: 8,
+    flexWrap: "wrap",
   },
   actionButton: {
     flex: 1,
+    minWidth: "30%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

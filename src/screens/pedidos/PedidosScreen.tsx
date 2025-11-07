@@ -147,14 +147,21 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
           await PedidosAPI.listarPedidos(filtrosComPaginacao);
 
         if (response.success && isMounted.current) {
-          setPedidos(response.pedidos);
+          const pedidosValidados = response.pedidos.map((pedido) => ({
+            ...pedido,
+            solicitante: pedido.solicitante || { id: 0, nome: "N/A" },
+            restaurante: pedido.restaurante || { id: 0, nome: "N/A" },
+            estabelecimento: pedido.estabelecimento || { id: 0, nome: "N/A" },
+          }));
+
+          setPedidos(pedidosValidados);
           setTotalCount(response.pagination.total);
           setHasMore(
             response.pagination.current_page < response.pagination.last_page
           );
           setCurrentPage(1);
 
-          const pedidosEntregues = response.pedidos.filter(
+          const pedidosEntregues = pedidosValidados.filter(
             (p) => p.status === 5
           );
           if (pedidosEntregues.length > 0) {
@@ -163,6 +170,7 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
         }
       } catch (error) {
         if (isMounted.current) {
+          console.error("Erro ao carregar pedidos:", error);
           showErrorToast("Erro ao carregar pedidos");
         }
       } finally {
@@ -191,13 +199,20 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
         await PedidosAPI.listarPedidos(filtrosComPaginacao);
 
       if (response.success && isMounted.current) {
-        setPedidos((prev) => [...prev, ...response.pedidos]);
+        const pedidosValidados = response.pedidos.map((pedido) => ({
+          ...pedido,
+          solicitante: pedido.solicitante || { id: 0, nome: "N/A" },
+          restaurante: pedido.restaurante || { id: 0, nome: "N/A" },
+          estabelecimento: pedido.estabelecimento || { id: 0, nome: "N/A" },
+        }));
+
+        setPedidos((prev) => [...prev, ...pedidosValidados]);
         setHasMore(
           response.pagination.current_page < response.pagination.last_page
         );
         setCurrentPage(currentPage + 1);
 
-        const pedidosEntregues = response.pedidos.filter((p) => p.status === 5);
+        const pedidosEntregues = pedidosValidados.filter((p) => p.status === 5);
         if (pedidosEntregues.length > 0) {
           checkTicketsStatus(pedidosEntregues);
         }
@@ -349,6 +364,10 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
     navigation.navigate("AdicionarItens", { pedidoId: pedido.id });
   };
 
+  const handleEntregarItens = (pedido: PedidoSimplificado) => {
+    navigation.navigate("EntregarItens", { pedidoId: pedido.id });
+  };
+
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
 
@@ -378,6 +397,7 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
       onMarkReady={() => handleMarkReady(item.id)}
       onShowQRCode={() => handleShowQRCode(item)}
       onScanQRCode={() => handleScanQRCode(item)}
+      onEntregarItens={() => handleEntregarItens(item)}
     />
   );
 
@@ -432,6 +452,7 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
     } else if (isRestaurante) {
       filters_tabs.push(
         { value: "1", label: "Pendentes" },
+        { value: "2", label: "Aceitos" },
         { value: "3", label: "Em Preparo" },
         { value: "4", label: "Prontos" },
         { value: "5", label: "Entregues" }
@@ -654,6 +675,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginBottom: 12,
+    flexWrap: "wrap",
   },
   filterTab: {
     paddingHorizontal: 16,
