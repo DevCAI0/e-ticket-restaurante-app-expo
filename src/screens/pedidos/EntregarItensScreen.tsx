@@ -1,14 +1,12 @@
-// src/screens/pedidos/EntregarItensScreen.tsx
+// src/screens/pedidos/EntregarItensScreen.tsx - VERSÃO ATUALIZADA
 import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   StyleSheet,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,13 +28,6 @@ export function EntregarItensScreen() {
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState<"normal" | "avulso">("normal");
-  const [selectedItem, setSelectedItem] = useState<PedidoItem | null>(null);
-
-  // Estados para formulário de entrega avulsa
-  const [nomeAvulso, setNomeAvulso] = useState("");
-  const [cpfAvulso, setCpfAvulso] = useState("");
-  const [observacao, setObservacao] = useState("");
-  const [entregando, setEntregando] = useState(false);
 
   useEffect(() => {
     loadPedido();
@@ -58,7 +49,6 @@ export function EntregarItensScreen() {
   };
 
   const handleScanFace = (item: PedidoItem) => {
-    // Navegar para tela de reconhecimento facial em modo pedido
     navigation.navigate("BiometricApproval", {
       mode: "pedido",
       pedidoId,
@@ -70,62 +60,16 @@ export function EntregarItensScreen() {
     });
   };
 
-  const handleEntregarAvulso = async () => {
-    if (!selectedItem) return;
-
-    if (!nomeAvulso.trim()) {
-      showErrorToast("Informe o nome da pessoa");
-      return;
-    }
-
-    Alert.alert(
-      "Confirmar Entrega",
-      `Entregar ticket avulso para ${nomeAvulso}?`,
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Confirmar",
-          onPress: async () => {
-            try {
-              setEntregando(true);
-              const response = await PedidosAPI.entregarItemAvulso(
-                pedidoId,
-                selectedItem.id,
-                {
-                  nome: nomeAvulso,
-                  cpf: cpfAvulso,
-                  observacao,
-                }
-              );
-
-              if (response.success) {
-                showSuccessToast("Item entregue com sucesso!");
-                setSelectedItem(null);
-                setNomeAvulso("");
-                setCpfAvulso("");
-                setObservacao("");
-                await loadPedido();
-              }
-            } catch (error: any) {
-              showErrorToast(error.message || "Erro ao entregar item");
-            } finally {
-              setEntregando(false);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const formatCPF = (value: string) => {
-    const numbers = value.replace(/\D/g, "");
-    if (numbers.length <= 11) {
-      return numbers
-        .replace(/(\d{3})(\d)/, "$1.$2")
-        .replace(/(\d{3})(\d)/, "$1.$2")
-        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
-    }
-    return value;
+  // ✅ ATUALIZADO: Ao clicar no item, abre o scanner diretamente
+  const handleSelectAvulsoItem = (item: PedidoItem) => {
+    navigation.navigate("ScanTicketAvulso", {
+      pedidoId,
+      itemId: item.id,
+      onSuccess: () => {
+        // Recarregar pedido após consumo bem-sucedido
+        loadPedido();
+      },
+    });
   };
 
   if (loading) {
@@ -172,10 +116,7 @@ export function EntregarItensScreen() {
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tab, selectedTab === "normal" && styles.tabActive]}
-          onPress={() => {
-            setSelectedTab("normal");
-            setSelectedItem(null);
-          }}
+          onPress={() => setSelectedTab("normal")}
         >
           <Ionicons
             name="person"
@@ -196,10 +137,7 @@ export function EntregarItensScreen() {
 
         <TouchableOpacity
           style={[styles.tab, selectedTab === "avulso" && styles.tabActive]}
-          onPress={() => {
-            setSelectedTab("avulso");
-            setSelectedItem(null);
-          }}
+          onPress={() => setSelectedTab("avulso")}
         >
           <Ionicons
             name="people"
@@ -260,19 +198,16 @@ export function EntregarItensScreen() {
             ))}
           </View>
         ) : (
-          // Lista de itens avulsos
+          // Lista de itens avulsos - Clique direto abre o scanner
           <View style={styles.itemsList}>
             <Text style={styles.sectionTitle}>
-              Selecione um item e preencha os dados
+              Toque em um item para escanear o ticket
             </Text>
             {itensAvulsos.map((item, index) => (
               <TouchableOpacity
                 key={item.id}
-                style={[
-                  styles.itemCard,
-                  selectedItem?.id === item.id && styles.itemCardSelected,
-                ]}
-                onPress={() => setSelectedItem(item)}
+                style={styles.itemCard}
+                onPress={() => handleSelectAvulsoItem(item)}
               >
                 <View style={styles.itemHeader}>
                   <View style={styles.itemNumber}>
@@ -285,90 +220,12 @@ export function EntregarItensScreen() {
                     </Text>
                   </View>
                 </View>
-                {selectedItem?.id === item.id && (
-                  <View style={styles.selectedBadge}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={colors.primary}
-                    />
-                    <Text style={styles.selectedBadgeText}>Selecionado</Text>
-                  </View>
-                )}
+                <View style={styles.itemAction}>
+                  <Ionicons name="scan" size={24} color={colors.primary} />
+                  <Text style={styles.itemActionText}>Escanear Ticket</Text>
+                </View>
               </TouchableOpacity>
             ))}
-
-            {/* Formulário de entrega avulsa */}
-            {selectedItem && (
-              <View style={styles.formCard}>
-                <Text style={styles.formTitle}>Dados da Entrega</Text>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Nome Completo *</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Digite o nome da pessoa"
-                    placeholderTextColor={colors.muted.light}
-                    value={nomeAvulso}
-                    onChangeText={setNomeAvulso}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>CPF (opcional)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="000.000.000-00"
-                    placeholderTextColor={colors.muted.light}
-                    value={cpfAvulso}
-                    onChangeText={(text) => setCpfAvulso(formatCPF(text))}
-                    keyboardType="numeric"
-                    maxLength={14}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Observação (opcional)</Text>
-                  <TextInput
-                    style={[styles.input, styles.textArea]}
-                    placeholder="Ex: Visitante, terceirizado..."
-                    placeholderTextColor={colors.muted.light}
-                    value={observacao}
-                    onChangeText={setObservacao}
-                    multiline
-                    numberOfLines={3}
-                  />
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.entregarButton,
-                    (!nomeAvulso.trim() || entregando) &&
-                      styles.entregarButtonDisabled,
-                  ]}
-                  onPress={handleEntregarAvulso}
-                  disabled={!nomeAvulso.trim() || entregando}
-                >
-                  {entregando ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.background.light}
-                    />
-                  ) : (
-                    <>
-                      <Ionicons
-                        name="checkmark"
-                        size={20}
-                        color={colors.background.light}
-                      />
-                      <Text style={styles.entregarButtonText}>
-                        Confirmar Entrega
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         )}
       </ScrollView>
@@ -480,10 +337,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  itemCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary + "10",
-  },
   itemHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -529,69 +382,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: colors.primary,
-  },
-  selectedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 8,
-  },
-  selectedBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.primary,
-  },
-  formCard: {
-    backgroundColor: colors.card.light,
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: colors.border.light,
-  },
-  formTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text.light,
-    marginBottom: 16,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text.light,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: colors.border.light,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: colors.text.light,
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  entregarButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: colors.success,
-    paddingVertical: 14,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  entregarButtonDisabled: {
-    opacity: 0.5,
-  },
-  entregarButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: colors.background.light,
   },
 });

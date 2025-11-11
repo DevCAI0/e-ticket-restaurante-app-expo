@@ -5,6 +5,8 @@ import axios from "axios";
 interface VerifyFaceRequest {
   imagem_base64: string;
   restaurante_id: number;
+  pedido_id?: number;
+  item_id?: number;
 }
 
 interface Liberacao {
@@ -14,7 +16,11 @@ interface Liberacao {
   tipo_refeicao: {
     id: number;
     nome: string;
+    horario_inicio?: string;
+    horario_fim?: string;
+    horario_fim_com_tolerancia?: string;
   };
+  disponivel_ate?: string;
 }
 
 interface Funcionario {
@@ -37,12 +43,27 @@ interface VerifyFaceResponse {
   reconhecimento?: Reconhecimento;
   liberacoes_disponiveis?: Liberacao[];
   total_liberacoes?: number;
+  hora_atual?: string;
+  modo_pedido?: boolean;
+  tolerancia_adicional?: string;
+  item_pedido?: {
+    id: number;
+    pedido_id: number;
+    tipo_refeicao_id: number;
+  };
+  liberacoes_fora_horario?: Array<{
+    tipo_refeicao: string;
+    horario_inicio: string;
+    horario_fim: string;
+  }>;
 }
 
 interface ConsumirLiberacaoRequest {
   liberacao_id: number;
   restaurante_id: number;
   estabelecimento_id: number;
+  pedido_id?: number;
+  item_id?: number;
 }
 
 interface TicketConsumido {
@@ -50,6 +71,8 @@ interface TicketConsumido {
   numero: string;
   token: string;
   token_formatado: string;
+  id_pedido?: number;
+  data_incluido_pedido?: string;
   funcionario: {
     id: number;
     nome: string;
@@ -80,6 +103,12 @@ interface ConsumirLiberacaoResponse {
     data: string;
     tipo_refeicao: string;
   };
+  item_pedido?: {
+    id: number;
+    pedido_id: number;
+    entregue: boolean;
+    data_entrega: string;
+  };
 }
 
 interface ValidateImageRequest {
@@ -106,38 +135,67 @@ interface HealthCheckResponse {
 }
 
 class FacialRecognitionService {
-  /**
-   * Verifica identidade facial e retorna liberações disponíveis
-   */
   async verificarIdentidadeFacial(
     params: VerifyFaceRequest
   ): Promise<VerifyFaceResponse> {
     try {
-      console.log("🔍 Iniciando verificação facial...");
-      console.log("📋 Parâmetros:", {
-        restaurante_id: params.restaurante_id,
-        imagem_tamanho: params.imagem_base64?.length || 0,
-      });
-
       const response = await api.post<VerifyFaceResponse>(
         "/restaurante/facial/verificar",
         params
       );
 
-      console.log("✅ Verificação concluída:", response.data.success);
       return response.data;
     } catch (error) {
-      console.error("❌ Erro ao verificar identidade:", error);
-
       if (axios.isAxiosError(error)) {
+        // Erro 400 - Fora do horário ou sem liberações no horário
+        if (error.response?.status === 400) {
+          const errorData = error.response.data as any;
+
+          // Se tem funcionário identificado mas está fora do horário
+          if (errorData?.funcionario) {
+            return {
+              success: false,
+              message:
+                errorData.error || "Liberações fora do horário permitido",
+              funcionario: errorData.funcionario,
+              reconhecimento: errorData.reconhecimento,
+              liberacoes_disponiveis: [],
+              total_liberacoes: 0,
+              hora_atual: errorData.hora_atual,
+              liberacoes_fora_horario: errorData.liberacoes_fora_horario,
+            };
+          }
+
+          throw new Error(
+            errorData?.error || "Erro ao verificar liberações disponíveis"
+          );
+        }
+
+        // Erro 404 - Funcionário identificado mas sem liberações
+        if (error.response?.status === 404) {
+          const errorData = error.response.data as any;
+
+          if (errorData?.funcionario) {
+            return {
+              success: true,
+              message:
+                errorData.error ||
+                "Funcionário identificado, mas não possui liberações disponíveis hoje",
+              funcionario: errorData.funcionario,
+              reconhecimento: errorData.reconhecimento,
+              liberacoes_disponiveis: [],
+              total_liberacoes: 0,
+              hora_atual: errorData.hora_atual,
+            };
+          }
+
+          throw new Error(errorData?.error || "Funcionário não identificado");
+        }
+
         if (error.response?.status === 401) {
           throw new Error("Sessão expirada. Por favor, faça login novamente.");
         }
-        if (error.response?.status === 404) {
-          throw new Error(
-            "Endpoint não encontrado. Verifique se a API está configurada corretamente."
-          );
-        }
+
         if (error.response) {
           const errorData = error.response.data as any;
           throw new Error(
@@ -146,11 +204,13 @@ class FacialRecognitionService {
               "Erro ao verificar identidade"
           );
         }
+
         if (error.code === "ECONNREFUSED" || error.code === "ECONNABORTED") {
           throw new Error(
             "Servidor não está disponível. Verifique sua conexão."
           );
         }
+
         if (error.request) {
           throw new Error(
             "Não foi possível conectar ao servidor. Verifique sua conexão."
@@ -162,30 +222,41 @@ class FacialRecognitionService {
     }
   }
 
-  /**
-   * Consome liberação e gera ticket
-   */
   async consumirLiberacao(
     params: ConsumirLiberacaoRequest
   ): Promise<ConsumirLiberacaoResponse> {
     try {
-      console.log("🎫 Consumindo liberação...");
-      console.log("📋 Parâmetros:", params);
-
       const response = await api.post<ConsumirLiberacaoResponse>(
         "/restaurante/facial/consumir-liberacao",
         params
       );
 
-      console.log("✅ Liberação consumida:", response.data.success);
       return response.data;
     } catch (error) {
-      console.error("❌ Erro ao consumir liberação:", error);
-
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 401) {
           throw new Error("Sessão expirada. Por favor, faça login novamente.");
         }
+
+        if (error.response?.status === 400) {
+          const errorData = error.response.data as any;
+
+          // Erros de horário
+          if (
+            errorData?.error?.includes("Muito cedo") ||
+            errorData?.error?.includes("expirada") ||
+            errorData?.error?.includes("expirado")
+          ) {
+            throw new Error(errorData.error);
+          }
+
+          throw new Error(
+            errorData?.error ||
+              errorData?.message ||
+              "Erro ao consumir liberação"
+          );
+        }
+
         if (error.response) {
           const errorData = error.response.data as any;
           throw new Error(
@@ -194,6 +265,7 @@ class FacialRecognitionService {
               "Erro ao consumir liberação"
           );
         }
+
         if (error.request) {
           throw new Error(
             "Não foi possível conectar ao servidor. Verifique sua conexão."
@@ -205,9 +277,6 @@ class FacialRecognitionService {
     }
   }
 
-  /**
-   * Valida se imagem contém exatamente um rosto
-   */
   async validarImagem(
     params: ValidateImageRequest
   ): Promise<ValidateImageResponse> {
@@ -219,14 +288,10 @@ class FacialRecognitionService {
 
       return response.data;
     } catch (error) {
-      console.error("❌ Erro ao validar imagem:", error);
       throw error;
     }
   }
 
-  /**
-   * Verifica saúde da API de reconhecimento facial
-   */
   async verificarSaude(): Promise<HealthCheckResponse> {
     try {
       const response = await api.get<HealthCheckResponse>(
@@ -235,7 +300,6 @@ class FacialRecognitionService {
 
       return response.data;
     } catch (error) {
-      console.error("❌ Erro ao verificar saúde da API:", error);
       return {
         success: false,
         status: "offline",

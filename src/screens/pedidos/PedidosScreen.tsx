@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   PedidoSimplificado,
   PedidosFilters,
@@ -28,13 +30,12 @@ import { PedidosHeader } from "./components/PedidosHeader";
 import { colors } from "../../constants/colors";
 import { BottomNav } from "../../components/common/BottomNav";
 import { usePedidosPendentes } from "../../hooks/usePedidosPendentes";
+import { RootStackParamList } from "../../navigation/AppNavigator";
 
-interface PedidosScreenProps {
-  navigation: any;
-  route?: any;
-}
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
+export function PedidosScreen() {
+  const navigation = useNavigation<NavigationProp>();
   const { user } = useAuth();
   const { isEstablishment, isRestaurant } = useProfilePermissions();
 
@@ -369,10 +370,13 @@ export function PedidosScreen({ navigation, route }: PedidosScreenProps) {
   };
 
   const handleTabChange = (tab: string) => {
+    console.log("📦 [PEDIDOS] Mudando para tab:", tab);
     setActiveTab(tab);
 
     if (tab === "home") {
       navigation.navigate("Home");
+    } else if (tab === "ajustes") {
+      navigation.navigate("Ajustes");
     }
   };
 

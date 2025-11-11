@@ -1,7 +1,6 @@
 // src/hooks/useFacialRecognition.ts
 import { useState } from "react";
 import { facialRecognitionService } from "../services/facialRecognitionService";
-import { showErrorToast, showSuccessToast } from "../lib/toast";
 
 interface Liberacao {
   id: number;
@@ -84,9 +83,6 @@ export const useFacialRecognition = () => {
   const [isConsuming, setIsConsuming] = useState(false);
   const [result, setResult] = useState<VerificationResult | null>(null);
 
-  /**
-   * Verifica identidade facial e retorna liberações disponíveis
-   */
   const verificarIdentidade = async (
     imageUri: string,
     restauranteId: number
@@ -95,7 +91,6 @@ export const useFacialRecognition = () => {
     setResult(null);
 
     try {
-      // Converter imagem para base64
       const response = await fetch(imageUri);
       const blob = await response.blob();
 
@@ -106,7 +101,6 @@ export const useFacialRecognition = () => {
         reader.readAsDataURL(blob);
       });
 
-      // Enviar para API
       const verificationResult =
         await facialRecognitionService.verificarIdentidadeFacial({
           imagem_base64: base64,
@@ -115,10 +109,14 @@ export const useFacialRecognition = () => {
 
       let resultData: VerificationResult;
 
-      if (verificationResult.success && verificationResult.funcionario) {
+      if (verificationResult.funcionario) {
         resultData = {
           success: true,
-          message: "Funcionário identificado com sucesso!",
+          message:
+            verificationResult.total_liberacoes &&
+            verificationResult.total_liberacoes > 0
+              ? "Funcionário identificado com sucesso!"
+              : "Funcionário identificado, mas não possui liberações disponíveis hoje",
           capturedImage: imageUri,
           referenceImage: verificationResult.funcionario.foto_referencia,
           funcionarioNome: verificationResult.funcionario.nome,
@@ -128,36 +126,63 @@ export const useFacialRecognition = () => {
             verificationResult.reconhecimento?.tempo_processamento,
           funcionario: verificationResult.funcionario,
           reconhecimento: verificationResult.reconhecimento,
-          liberacoes_disponiveis: verificationResult.liberacoes_disponiveis,
-          total_liberacoes: verificationResult.total_liberacoes,
+          liberacoes_disponiveis:
+            verificationResult.liberacoes_disponiveis || [],
+          total_liberacoes: verificationResult.total_liberacoes || 0,
         };
-
-        showSuccessToast(`Bem-vindo, ${verificationResult.funcionario.nome}!`);
-
-        if (verificationResult.total_liberacoes === 0) {
-          showErrorToast("Nenhuma liberação disponível");
-        }
       } else {
         resultData = {
           success: false,
           message:
             verificationResult.message ||
-            "Não foi possível verificar sua identidade",
+            "Não foi possível identificar o funcionário. Tente novamente.",
           capturedImage: imageUri,
         };
-
-        showErrorToast(resultData.message);
       }
 
       setResult(resultData);
       return resultData;
-    } catch (error) {
-      console.error("Erro ao verificar identidade:", error);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        const errorData = error.response?.data;
+
+        if (errorData?.funcionario) {
+          const resultData: VerificationResult = {
+            success: true,
+            message:
+              "Funcionário identificado, mas não possui liberações disponíveis hoje",
+            capturedImage: imageUri,
+            referenceImage: errorData.funcionario.foto_referencia,
+            funcionarioNome: errorData.funcionario.nome,
+            funcionarioId: String(errorData.funcionario.id),
+            similaridade: errorData.reconhecimento?.similaridade,
+            tempoProcessamento: errorData.reconhecimento?.tempo_processamento,
+            funcionario: errorData.funcionario,
+            reconhecimento: errorData.reconhecimento,
+            liberacoes_disponiveis: [],
+            total_liberacoes: 0,
+          };
+
+          setResult(resultData);
+          return resultData;
+        }
+
+        const errorResult: VerificationResult = {
+          success: false,
+          message:
+            errorData?.error ||
+            "Não foi possível identificar o funcionário. Tente novamente.",
+          capturedImage: imageUri,
+        };
+
+        setResult(errorResult);
+        return errorResult;
+      }
 
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Erro ao processar verificação facial";
+          : "Erro ao processar reconhecimento facial. Tente novamente.";
 
       const errorResult: VerificationResult = {
         success: false,
@@ -166,17 +191,12 @@ export const useFacialRecognition = () => {
       };
 
       setResult(errorResult);
-      showErrorToast(errorMessage);
-
       return errorResult;
     } finally {
       setIsVerifying(false);
     }
   };
 
-  /**
-   * Consome uma liberação e gera o ticket
-   */
   const consumirLiberacao = async (
     liberacaoId: number,
     restauranteId: number,
@@ -191,25 +211,14 @@ export const useFacialRecognition = () => {
         estabelecimento_id: estabelecimentoId,
       });
 
-      if (result.success && result.ticket) {
-        showSuccessToast(
-          `Ticket ${result.ticket.numero} consumido com sucesso!`
-        );
-
-        // Limpar resultado da verificação após consumo
+      if (result.success) {
         setResult(null);
-      } else {
-        showErrorToast(result.message || "Erro ao consumir liberação");
       }
 
       return result;
     } catch (error) {
-      console.error("Erro ao consumir liberação:", error);
-
       const errorMessage =
         error instanceof Error ? error.message : "Erro ao consumir liberação";
-
-      showErrorToast(errorMessage);
 
       return {
         success: false,
@@ -220,9 +229,6 @@ export const useFacialRecognition = () => {
     }
   };
 
-  /**
-   * Verifica se a API está online
-   */
   const verificarDisponibilidade = async () => {
     setIsCheckingHealth(true);
 
@@ -230,25 +236,17 @@ export const useFacialRecognition = () => {
       const health = await facialRecognitionService.verificarSaude();
 
       if (health.success && health.status === "online") {
-        showSuccessToast(
-          `API Online: ${health.employeesWithFaces} funcionário(s) cadastrado(s)`
-        );
         return true;
       } else {
-        showErrorToast("API de reconhecimento facial offline");
         return false;
       }
     } catch (error) {
-      showErrorToast("Erro ao verificar disponibilidade da API");
       return false;
     } finally {
       setIsCheckingHealth(false);
     }
   };
 
-  /**
-   * Valida se imagem contém um rosto válido
-   */
   const validarImagem = async (imageUri: string) => {
     try {
       const response = await fetch(imageUri);
@@ -267,26 +265,19 @@ export const useFacialRecognition = () => {
 
       return validationResult;
     } catch (error) {
-      console.error("Erro ao validar imagem:", error);
       throw error;
     }
   };
 
-  /**
-   * Limpa o resultado da verificação
-   */
   const limparResultado = () => {
     setResult(null);
   };
 
   return {
-    // Estados
     isVerifying,
     isCheckingHealth,
     isConsuming,
     result,
-
-    // Métodos
     verificarIdentidade,
     consumirLiberacao,
     verificarDisponibilidade,

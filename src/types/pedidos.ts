@@ -234,12 +234,13 @@ export interface QRScanResponse {
 export interface EntregarItemFuncionarioRequest {
   funcionario_id: number;
   liberacao_id: number;
+  ticket_id: number;
 }
 
 export interface EntregarItemAvulsoRequest {
   nome: string;
   cpf?: string;
-  numero_ticket?: string;
+  token: string; // ✅ Token é obrigatório
   observacao?: string;
 }
 

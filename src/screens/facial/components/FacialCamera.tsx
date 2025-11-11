@@ -1,5 +1,4 @@
 // src/screens/facial/components/FacialCamera.tsx
-// COM CÍRCULO OVAL - Aparece após desafios de virar
 
 import React, { useRef, useState, useEffect } from "react";
 import {
@@ -32,8 +31,6 @@ interface FacialCameraProps {
   cameraType?: "front" | "back";
 }
 
-type LivenessChallenge = "blink" | "turn-left" | "turn-right" | "smile";
-
 type CaptureStatus =
   | "waiting-face"
   | "face-ok"
@@ -65,11 +62,9 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showOval, setShowOval] = useState(false);
 
-  // Desafios: primeiro virar, depois piscar/sorrir
   const turnChallengeRef = useRef<"turn-left" | "turn-right">("turn-left");
   const finalChallengeRef = useRef<"blink" | "smile">("blink");
 
-  // Estados para detecção
   const prevYawRef = useRef<number>(0);
   const prevLeftEyeRef = useRef<number>(1);
   const prevRightEyeRef = useRef<number>(1);
@@ -86,15 +81,8 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   }, []);
 
   const generateRandomChallenges = () => {
-    // Escolhe aleatoriamente: virar esquerda ou direita
     turnChallengeRef.current = Math.random() > 0.5 ? "turn-left" : "turn-right";
-
-    // Escolhe aleatoriamente: piscar ou sorrir
     finalChallengeRef.current = Math.random() > 0.5 ? "blink" : "smile";
-
-    console.log(
-      `🎲 Desafios: 1=${turnChallengeRef.current} | 2=${finalChallengeRef.current}`
-    );
   };
 
   useEffect(() => {
@@ -156,9 +144,7 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
       const photo = await cameraRef.current.takePhoto({ flash: "off" });
       const imageUri = `file://${photo.path}`;
       await checkFaceAndLiveness(imageUri);
-    } catch (error) {
-      console.log("Erro na validação:", error);
-    }
+    } catch (error) {}
   };
 
   const checkFaceAndLiveness = async (imageUri: string) => {
@@ -171,28 +157,25 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 
       const result = await FaceDetector.detectFacesAsync(imageUri, options);
 
-      // SEM ROSTO - Mais tolerante durante desafios
       if (result.faces.length === 0) {
         const isTurning = status === "challenge-turn";
         const isBlinking =
           status === "challenge-final" && finalChallengeRef.current === "blink";
 
         if (isTurning || isBlinking) {
-          console.log("⏸️ Perda temporária de rosto - ignorando");
           return;
         }
 
         if (status === "waiting-face") {
-          return; // Aguarda rosto aparecer
+          return;
         }
 
         return;
       }
 
-      // MÚLTIPLOS ROSTOS
       if (result.faces.length > 1) {
         setStatus("error");
-        setErrorMessage("Apenas uma pessoa por vez");
+        setErrorMessage("Apenas uma pessoa");
         setTimeout(() => resetToStart(), 3000);
         return;
       }
@@ -203,17 +186,10 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
       const smilingProbability = face.smilingProbability || 0;
       const yawAngle = face.yawAngle || 0;
 
-      console.log(
-        `👁️ E${Math.round(leftEyeOpen * 100)}% D${Math.round(rightEyeOpen * 100)}% | 😊 ${Math.round(smilingProbability * 100)}% | 🔄 ${Math.round(yawAngle)}°`
-      );
-
-      // MÁQUINA DE ESTADOS
       if (status === "waiting-face") {
-        console.log("✅ STEP 1: Rosto detectado!");
         setStatus("face-ok");
 
         stepTimerRef.current = setTimeout(() => {
-          console.log(`➡️ STEP 2: Desafio virar = ${turnChallengeRef.current}`);
           setStatus("challenge-turn");
           resetChallengeState();
           startCountdown(12);
@@ -222,10 +198,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         const completed = checkTurnChallenge(yawAngle);
 
         if (completed) {
-          console.log(
-            `✅ Desafio virar (${turnChallengeRef.current}) COMPLETO!`
-          );
-
           if (stepTimerRef.current) {
             clearInterval(stepTimerRef.current);
             clearTimeout(stepTimerRef.current);
@@ -247,10 +219,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         );
 
         if (completed) {
-          console.log(
-            `✅ Desafio final (${finalChallengeRef.current}) COMPLETO!`
-          );
-
           if (stepTimerRef.current) {
             clearInterval(stepTimerRef.current);
             clearTimeout(stepTimerRef.current);
@@ -265,28 +233,20 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
           }, 1000);
         }
       }
-    } catch (error) {
-      console.log("Erro ao analisar:", error);
-    }
+    } catch (error) {}
   };
 
   const checkTurnChallenge = (yawAngle: number): boolean => {
     const challenge = turnChallengeRef.current;
 
     if (challenge === "turn-left") {
-      // Detecta virada para esquerda
       if (yawAngle < -15 && !turnDetectedRef.current) {
-        console.log(`👈 Virou ESQUERDA! (${yawAngle.toFixed(1)}°)`);
         turnDetectedRef.current = true;
         prevYawRef.current = yawAngle;
         return false;
       }
 
-      // Detecta retorno
       if (turnDetectedRef.current && yawAngle > prevYawRef.current + 8) {
-        console.log(
-          `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
-        );
         return true;
       }
 
@@ -294,20 +254,13 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         prevYawRef.current = yawAngle;
       }
     } else {
-      // turn-right
-      // Detecta virada para direita
       if (yawAngle > 15 && !turnDetectedRef.current) {
-        console.log(`👉 Virou DIREITA! (${yawAngle.toFixed(1)}°)`);
         turnDetectedRef.current = true;
         prevYawRef.current = yawAngle;
         return false;
       }
 
-      // Detecta retorno
       if (turnDetectedRef.current && yawAngle < prevYawRef.current - 8) {
-        console.log(
-          `✅ VOLTOU! (${prevYawRef.current.toFixed(1)}° → ${yawAngle.toFixed(1)}°)`
-        );
         return true;
       }
 
@@ -335,12 +288,10 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
       prevRightEyeRef.current = rightEyeOpen;
 
       if (totalChange > 0.8) {
-        console.log(`👁️ PISCADA! Variação: ${Math.round(totalChange * 100)}%`);
         return true;
       }
     } else if (challenge === "smile") {
       if (smilingProbability >= 0.5) {
-        console.log(`😊 Sorriso! (${Math.round(smilingProbability * 100)}%)`);
         return true;
       }
     }
@@ -349,11 +300,9 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   };
 
   const showOvalCircle = () => {
-    console.log("🔵 STEP 3: Mostrando círculo oval...");
     setStatus("show-oval");
     setShowOval(true);
 
-    // Animação do círculo aparecendo
     Animated.spring(ovalScaleAnim, {
       toValue: 1,
       tension: 50,
@@ -362,7 +311,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
     }).start();
 
     stepTimerRef.current = setTimeout(() => {
-      console.log(`➡️ STEP 4: Desafio final = ${finalChallengeRef.current}`);
       setStatus("challenge-final");
       resetChallengeState();
       startCountdown(12);
@@ -388,9 +336,8 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(countdown);
-          console.log(`⏰ Timeout do desafio`);
           setStatus("error");
-          setErrorMessage(`Você não completou o desafio. Tente novamente.`);
+          setErrorMessage("Tempo esgotado");
           setTimeout(() => resetToStart(), 3000);
           return 0;
         }
@@ -402,7 +349,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   };
 
   const prepareToCapture = () => {
-    console.log("🎯 STEP 5: Preparando captura...");
     setStatus("ready-to-capture");
 
     stepTimerRef.current = setTimeout(() => {
@@ -413,7 +359,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   const capturePhoto = async () => {
     if (!cameraRef.current) return;
 
-    console.log("📸 STEP 6: Capturando...");
     setStatus("capturing");
 
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -426,9 +371,8 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
       setStatus("analyzing");
       await finalValidation(imageUri);
     } catch (error) {
-      console.error("Erro ao capturar:", error);
       setStatus("error");
-      setErrorMessage("Erro ao capturar foto.");
+      setErrorMessage("Erro ao capturar");
       setTimeout(() => resetToStart(), 3000);
     }
   };
@@ -445,13 +389,12 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 
       if (result.faces.length !== 1) {
         setStatus("error");
-        setErrorMessage("Erro na foto final");
+        setErrorMessage("Erro na validação");
         setCapturedPhoto(null);
         setTimeout(() => resetToStart(), 3000);
         return;
       }
 
-      console.log("✅ STEP 7: SUCESSO!");
       setStatus("success");
 
       Animated.sequence([
@@ -469,16 +412,14 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
         onCapture(imageUri);
       });
     } catch (error) {
-      console.error("Erro validação final:", error);
       setStatus("error");
-      setErrorMessage("Erro ao validar foto");
+      setErrorMessage("Erro ao validar");
       setCapturedPhoto(null);
       setTimeout(() => resetToStart(), 3000);
     }
   };
 
   const resetToStart = () => {
-    console.log("🔄 Resetando...");
     setStatus("waiting-face");
     setTimeRemaining(0);
     setCapturedPhoto(null);
@@ -493,35 +434,29 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
   const getInstructionText = () => {
     switch (status) {
       case "waiting-face":
-        return `${funcionarioNome ? `Olá, ${funcionarioNome}!\n` : ""}Mostre seu rosto para a câmera`;
+        return "Mostre seu rosto";
       case "face-ok":
-        return "Rosto detectado! Preparando desafio...";
+        return "Preparando...";
       case "challenge-turn":
-        const turnText =
-          turnChallengeRef.current === "turn-left"
-            ? "👈 Vire o rosto para ESQUERDA"
-            : "👉 Vire o rosto para DIREITA";
-        return `${turnText}\n(${timeRemaining}s)`;
+        return turnChallengeRef.current === "turn-left"
+          ? "Vire para ESQUERDA"
+          : "Vire para DIREITA";
       case "turn-ok":
-        return "Desafio completo! ✅";
+        return "Completo!";
       case "show-oval":
-        return "Posicione seu rosto no círculo";
+        return "Posicione no círculo";
       case "challenge-final":
-        const finalText =
-          finalChallengeRef.current === "blink"
-            ? "👁️ PISQUE os olhos"
-            : "😊 SORRIA";
-        return `${finalText}\n(${timeRemaining}s)`;
+        return finalChallengeRef.current === "blink" ? "Pisque" : "Sorria";
       case "final-ok":
-        return "Perfeito! ✅";
+        return "Perfeito!";
       case "ready-to-capture":
-        return "Pronto! Capturando...";
+        return "Capturando...";
       case "capturing":
-        return "Capturando foto...";
+        return "Processando...";
       case "analyzing":
         return "Analisando...";
       case "success":
-        return "Verificação concluída! ✨";
+        return "Concluído!";
       case "error":
         return errorMessage;
       default:
@@ -596,7 +531,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
           <View style={{ width: 44 }} />
         </View>
 
-        {/* CÍRCULO OVAL - Aparece após virar */}
         <View style={styles.centerContainer}>
           {showOval && (
             <Animated.View
@@ -633,78 +567,6 @@ export const FacialCamera: React.FC<FacialCameraProps> = ({
 
           <View style={styles.instructionBox}>
             <Text style={styles.instructionText}>{getInstructionText()}</Text>
-          </View>
-
-          <View style={styles.progressContainer}>
-            <View style={styles.progressStep}>
-              <View
-                style={[
-                  styles.progressDot,
-                  {
-                    backgroundColor:
-                      status !== "waiting-face"
-                        ? colors.success
-                        : colors.muted.light,
-                  },
-                ]}
-              />
-              <Text style={styles.progressText}>Rosto</Text>
-            </View>
-            <View style={styles.progressStep}>
-              <View
-                style={[
-                  styles.progressDot,
-                  {
-                    backgroundColor:
-                      status === "turn-ok" ||
-                      status === "show-oval" ||
-                      status === "challenge-final" ||
-                      status === "final-ok" ||
-                      status === "ready-to-capture" ||
-                      status === "capturing" ||
-                      status === "analyzing" ||
-                      status === "success"
-                        ? colors.success
-                        : colors.muted.light,
-                  },
-                ]}
-              />
-              <Text style={styles.progressText}>Virar</Text>
-            </View>
-            <View style={styles.progressStep}>
-              <View
-                style={[
-                  styles.progressDot,
-                  {
-                    backgroundColor:
-                      status === "final-ok" ||
-                      status === "ready-to-capture" ||
-                      status === "capturing" ||
-                      status === "analyzing" ||
-                      status === "success"
-                        ? colors.success
-                        : colors.muted.light,
-                  },
-                ]}
-              />
-              <Text style={styles.progressText}>Círculo</Text>
-            </View>
-            <View style={styles.progressStep}>
-              <View
-                style={[
-                  styles.progressDot,
-                  {
-                    backgroundColor:
-                      status === "capturing" ||
-                      status === "analyzing" ||
-                      status === "success"
-                        ? colors.success
-                        : colors.muted.light,
-                  },
-                ]}
-              />
-              <Text style={styles.progressText}>Foto</Text>
-            </View>
           </View>
         </View>
       </View>
@@ -787,25 +649,21 @@ const styles = StyleSheet.create({
   timerText: { fontSize: 36, fontWeight: "bold", color: "#ffffff" },
   instructionBox: {
     backgroundColor: "rgba(255, 255, 255, 0.1)",
-    paddingHorizontal: 32,
-    paddingVertical: 20,
-    borderRadius: 16,
-    maxWidth: "90%",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    maxWidth: "85%",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.2)",
   },
   instructionText: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "700",
     textAlign: "center",
-    lineHeight: 26,
+    lineHeight: 20,
   },
-  progressContainer: { flexDirection: "row", gap: 16 },
-  progressStep: { alignItems: "center", gap: 6 },
-  progressDot: { width: 12, height: 12, borderRadius: 6 },
-  progressText: { color: "#ffffff", fontSize: 11, fontWeight: "500" },
   noPermissionContainer: {
     flex: 1,
     alignItems: "center",

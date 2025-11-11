@@ -22,6 +22,7 @@ export const routes = {
   QR_CODE: "QRCode",
   QR_SCANNER: "QRScanner",
   ENTREGAR_ITENS: "EntregarItens",
+  SCAN_TICKET_AVULSO: "ScanTicketAvulso", // ✅ NOVO
 
   // Outros
   ORDERS: "Orders",

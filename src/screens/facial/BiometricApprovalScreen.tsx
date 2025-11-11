@@ -85,38 +85,25 @@ export const BiometricApprovalScreen: React.FC = () => {
   const [restauranteId, setRestauranteId] = useState<number | null>(null);
   const [loadingPedido, setLoadingPedido] = useState(false);
 
-  // Detectar se está em modo pedido
   const isModoPedido =
     params.mode === "pedido" || (!!params.pedidoId && !!params.itemId);
 
-  // Buscar dados do pedido se estiver em modo pedido
   useEffect(() => {
     const loadPedidoData = async () => {
       if (isModoPedido && params.pedidoId) {
         try {
           setLoadingPedido(true);
-          console.log("🔍 Buscando dados do pedido:", params.pedidoId);
 
           const response = await PedidosAPI.obterPedido(params.pedidoId);
 
           if (response.success && response.pedido) {
-            // ✅ Agora o pedido tem id_restaurante direto
             const idRestaurante = response.pedido.id_restaurante;
             setRestauranteId(idRestaurante);
-            console.log("✅ ID do restaurante do pedido:", idRestaurante);
-            console.log("📝 Dados do pedido:", {
-              codigo: response.pedido.codigo_pedido,
-              restaurante: response.pedido.restaurante?.nome,
-              id_restaurante: idRestaurante,
-              id_estabelecimento: response.pedido.id_estabelecimento,
-            });
           } else {
-            console.error("❌ Erro ao buscar pedido:", response);
             showErrorToast("Erro ao carregar dados do pedido");
             navigation.goBack();
           }
         } catch (error) {
-          console.error("❌ Erro ao buscar dados do pedido:", error);
           showErrorToast("Erro ao carregar dados do pedido");
           navigation.goBack();
         } finally {
@@ -134,42 +121,20 @@ export const BiometricApprovalScreen: React.FC = () => {
   };
 
   const handleCapture = async (imageUri: string) => {
-    // Determinar qual ID usar baseado no contexto
     let idParaVerificacao: number | null = null;
 
     if (isModoPedido) {
-      // Em modo pedido, usar o ID do restaurante do pedido
       idParaVerificacao = restauranteId;
-      console.log(
-        "📦 Modo Pedido - Usando ID do restaurante do pedido:",
-        idParaVerificacao
-      );
     } else {
-      // Em modo avulso, usar id_restaurante do usuário ou fallback para id_estabelecimento
       idParaVerificacao =
         user?.id_restaurante || user?.id_estabelecimento || null;
-      console.log("🎫 Modo Avulso - Usando ID:", idParaVerificacao);
-      console.log("   - id_restaurante:", user?.id_restaurante);
-      console.log("   - id_estabelecimento:", user?.id_estabelecimento);
     }
 
     if (!idParaVerificacao) {
       showErrorToast("Erro: Restaurante não identificado");
-      console.error("❌ Nenhum ID disponível para verificação");
-      console.error("   - Modo pedido:", isModoPedido);
-      console.error("   - ID restaurante do pedido:", restauranteId);
-      console.error("   - ID restaurante do usuário:", user?.id_restaurante);
-      console.error(
-        "   - ID estabelecimento do usuário:",
-        user?.id_estabelecimento
-      );
       setStep("intro");
       return;
     }
-
-    console.log("✅ Iniciando verificação biométrica");
-    console.log("   - ID para verificação:", idParaVerificacao);
-    console.log("   - Modo:", isModoPedido ? "Pedido" : "Avulso");
 
     setStep("processing");
 
@@ -179,70 +144,41 @@ export const BiometricApprovalScreen: React.FC = () => {
         idParaVerificacao
       );
 
-      console.log("📊 Resultado da verificação:", {
-        success: verificationResult.success,
-        funcionario: verificationResult.funcionario?.nome,
-        total_liberacoes: verificationResult.total_liberacoes,
-      });
-
       setResult(verificationResult);
 
-      if (
-        verificationResult.success &&
-        verificationResult.total_liberacoes &&
-        verificationResult.total_liberacoes > 0
-      ) {
-        console.log(
-          "✅ Liberações encontradas:",
-          verificationResult.total_liberacoes
-        );
-        setStep("liberacoes");
+      if (verificationResult.success) {
+        if (
+          verificationResult.total_liberacoes &&
+          verificationResult.total_liberacoes > 0
+        ) {
+          setStep("liberacoes");
+        } else {
+          setStep("result");
+        }
       } else {
-        console.log("ℹ️ Nenhuma liberação disponível ou verificação falhou");
         setStep("result");
       }
     } catch (error) {
-      console.error("❌ Erro na verificação:", error);
       showErrorToast("Erro ao verificar identidade");
       setStep("intro");
     }
   };
 
   const handleConsumirLiberacao = async (liberacaoId: number) => {
-    // Determinar qual ID usar baseado no contexto
     let idRestauranteParaConsumo: number | null = null;
 
     if (isModoPedido) {
-      // Em modo pedido, usar o ID do restaurante do pedido
       idRestauranteParaConsumo = restauranteId;
-      console.log(
-        "📦 Modo Pedido - Usando ID do restaurante do pedido:",
-        idRestauranteParaConsumo
-      );
     } else {
-      // Em modo avulso, usar id_restaurante do usuário ou fallback para id_estabelecimento
       idRestauranteParaConsumo =
         user?.id_restaurante || user?.id_estabelecimento || null;
-      console.log("🎫 Modo Avulso - Usando ID:", idRestauranteParaConsumo);
     }
 
     const estabelecimentoId = user?.id_estabelecimento;
 
     if (!idRestauranteParaConsumo || !estabelecimentoId) {
       showErrorToast("Dados do estabelecimento/restaurante não encontrados");
-      console.error("❌ IDs necessários não disponíveis");
-      console.error("   - ID restaurante:", idRestauranteParaConsumo);
-      console.error("   - ID estabelecimento:", estabelecimentoId);
       return;
-    }
-
-    console.log("🎟️ Iniciando consumo de liberação:");
-    console.log("   - Liberação ID:", liberacaoId);
-    console.log("   - Restaurante ID:", idRestauranteParaConsumo);
-    console.log("   - Estabelecimento ID:", estabelecimentoId);
-    if (isModoPedido) {
-      console.log("   - Pedido ID:", params.pedidoId);
-      console.log("   - Item ID:", params.itemId);
     }
 
     setConsumingId(liberacaoId);
@@ -255,19 +191,11 @@ export const BiometricApprovalScreen: React.FC = () => {
         estabelecimentoId
       );
 
-      console.log("📊 Resultado do consumo:", {
-        success: consumoResult.success,
-        ticket: consumoResult.ticket?.id,
-        message: consumoResult.message,
-      });
-
       if (consumoResult.success && consumoResult.ticket) {
         setTicketGerado(consumoResult.ticket);
 
         if (isModoPedido) {
-          // Se está em modo pedido, precisamos vincular o ticket ao item do pedido
           if (params.pedidoId && params.itemId && result?.funcionario) {
-            console.log("🔗 Vinculando ticket ao item do pedido...");
             await vincularTicketAoItem(
               consumoResult.ticket.id,
               params.pedidoId,
@@ -280,7 +208,6 @@ export const BiometricApprovalScreen: React.FC = () => {
           showSuccessToast("Item do pedido entregue com sucesso!");
 
           if (params.onSuccess) {
-            console.log("✅ Executando callback onSuccess");
             params.onSuccess();
           }
 
@@ -295,12 +222,10 @@ export const BiometricApprovalScreen: React.FC = () => {
           }, 2000);
         }
       } else {
-        console.error("❌ Falha no consumo:", consumoResult.message);
         showErrorToast(consumoResult.message);
         setStep("liberacoes");
       }
     } catch (error) {
-      console.error("❌ Erro ao consumir liberação:", error);
       showErrorToast("Erro ao processar liberação");
       setStep("liberacoes");
     } finally {
@@ -308,7 +233,6 @@ export const BiometricApprovalScreen: React.FC = () => {
     }
   };
 
-  // Função auxiliar para vincular o ticket ao item do pedido
   const vincularTicketAoItem = async (
     ticketId: number,
     pedidoId: number,
@@ -317,40 +241,27 @@ export const BiometricApprovalScreen: React.FC = () => {
     liberacaoId: number
   ) => {
     try {
-      console.log("🔗 Vinculando ticket ao item do pedido:");
-      console.log("   - Ticket ID:", ticketId);
-      console.log("   - Pedido ID:", pedidoId);
-      console.log("   - Item ID:", itemId);
-      console.log("   - Funcionário ID:", funcionarioId);
-      console.log("   - Liberação ID:", liberacaoId);
-
-      // ✅ Chamar a API para entregar o item
       await PedidosAPI.entregarItemFuncionario(pedidoId, itemId, {
         funcionario_id: funcionarioId,
         liberacao_id: liberacaoId,
+        ticket_id: ticketId,
       });
-
-      console.log("✅ Item entregue e ticket vinculado com sucesso");
     } catch (error) {
-      console.error("❌ Erro ao vincular ticket:", error);
       throw error;
     }
   };
 
   const handleCancel = () => {
-    console.log("❌ Captura cancelada pelo usuário");
     setStep("intro");
   };
 
   const handleRetry = () => {
-    console.log("🔄 Tentando novamente...");
     setResult(null);
     setTicketGerado(null);
     setStep("intro");
   };
 
   const handleClose = () => {
-    console.log("🚪 Fechando tela de aprovação biométrica");
     navigation.goBack();
   };
 
@@ -391,47 +302,6 @@ export const BiometricApprovalScreen: React.FC = () => {
               ? "Identifique o funcionário através do reconhecimento facial para entregar o item do pedido"
               : "Identifique o funcionário através do reconhecimento facial para visualizar suas liberações disponíveis"}
           </Text>
-
-          {/* Informação de debug em desenvolvimento */}
-          {__DEV__ && (
-            <Card style={styles.debugCard}>
-              <Text style={styles.debugTitle}>🔍 Debug Info</Text>
-              <Text style={styles.debugText}>
-                Modo: {isModoPedido ? "Pedido" : "Avulso"}
-              </Text>
-              {isModoPedido && (
-                <>
-                  <Text style={styles.debugText}>
-                    Pedido ID: {params.pedidoId || "null"}
-                  </Text>
-                  <Text style={styles.debugText}>
-                    Item ID: {params.itemId || "null"}
-                  </Text>
-                  <Text style={styles.debugText}>
-                    ID Restaurante (Pedido): {restauranteId || "carregando..."}
-                  </Text>
-                </>
-              )}
-              <Text style={styles.debugText}>Usuário: {user?.nome}</Text>
-              <Text style={styles.debugText}>
-                ID Restaurante (User): {user?.id_restaurante || "null"}
-              </Text>
-              <Text style={styles.debugText}>
-                ID Estabelecimento: {user?.id_estabelecimento || "null"}
-              </Text>
-              <Text
-                style={[
-                  styles.debugText,
-                  { fontWeight: "bold", color: colors.success },
-                ]}
-              >
-                ID a ser usado:{" "}
-                {isModoPedido
-                  ? restauranteId || "carregando..."
-                  : user?.id_restaurante || user?.id_estabelecimento || "null"}
-              </Text>
-            </Card>
-          )}
 
           <View style={styles.instructionsContainer}>
             <Text style={styles.instructionsTitle}>Como funciona:</Text>
@@ -623,7 +493,7 @@ export const BiometricApprovalScreen: React.FC = () => {
 
       {step === "consuming" && renderConsuming()}
 
-      {step === "result" && result && !result.liberacoes_disponiveis && (
+      {step === "result" && result && (
         <FacialResult
           success={result.success}
           message={result.message}
@@ -700,27 +570,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 32,
     lineHeight: 24,
-  },
-  debugCard: {
-    width: "100%",
-    padding: 12,
-    marginBottom: 24,
-    backgroundColor: colors.primary + "05",
-    borderWidth: 1,
-    borderColor: colors.primary + "20",
-    borderRadius: 8,
-  },
-  debugTitle: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: colors.primary,
-    marginBottom: 8,
-  },
-  debugText: {
-    fontSize: 12,
-    color: colors.text.light,
-    marginBottom: 4,
-    fontFamily: "monospace",
   },
   instructionsContainer: {
     width: "100%",

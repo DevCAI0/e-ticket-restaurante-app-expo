@@ -1,5 +1,4 @@
-// src/navigation/AppNavigator.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../hooks/useAuth";
@@ -17,32 +16,25 @@ import { CancelarPedidoScreen } from "../screens/pedidos/components/CancelarPedi
 import { QRCodeScreen } from "../screens/pedidos/QRCodeScreen";
 import { QRScannerScreen } from "../screens/pedidos/QRScannerScreen";
 import { EntregarItensScreen } from "../screens/pedidos/EntregarItensScreen";
+import { ScanTicketAvulsoScreen } from "../screens/pedidos/ScanTicketAvulsoScreen"; // ✅ NOVO
+import { SettingsScreen } from "../screens/settings/SettingsScreen";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { colors } from "../constants/colors";
 import { routes } from "./routes";
 import { PedidoSimplificado } from "../types/pedidos";
+import { setAuthErrorCallback } from "../lib/axios";
 
 export type RootStackParamList = {
-  // Autenticação
   SignIn: undefined;
-
-  // Principal
   Home: undefined;
-
-  // Tickets
   Scanner: undefined;
   ManualVerification: undefined;
   BiometricApproval: {
-    // Modo de operação
     mode?: "pedido" | "avulso";
-    // Parâmetros para modo pedido
     pedidoId?: number;
     itemId?: number;
-    // Callback de sucesso
     onSuccess?: () => void;
   };
-
-  // Pedidos
   Pedidos: undefined;
   PedidoDetalhes: {
     pedidoId: number;
@@ -66,6 +58,13 @@ export type RootStackParamList = {
   EntregarItens: {
     pedidoId: number;
   };
+  // ✅ NOVO: Adicionar tipo para a nova tela
+  ScanTicketAvulso: {
+    pedidoId: number;
+    itemId: number;
+    onSuccess?: (ticketData: any) => void;
+  };
+  Ajustes: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -77,8 +76,14 @@ const LoadingScreen = () => (
 );
 
 export const AppNavigator: React.FC = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { canAccessTickets, canAccessOrders } = useProfilePermissions();
+
+  useEffect(() => {
+    setAuthErrorCallback(() => {
+      logout();
+    });
+  }, [logout]);
 
   if (loading) {
     return <LoadingScreen />;
@@ -94,11 +99,11 @@ export const AppNavigator: React.FC = () => {
       >
         {user ? (
           <>
-            {/* Tela Principal */}
             <Stack.Screen name={routes.HOME} component={HomeScreen} />
 
-            {/* Tela de Reconhecimento Facial - DISPONÍVEL PARA TODOS */}
-            {/* Esta tela é usada tanto para tickets quanto para pedidos */}
+            {/* Tela de Ajustes - disponível para todos */}
+            <Stack.Screen name="Ajustes" component={SettingsScreen} />
+
             <Stack.Screen
               name={routes.BIOMETRIC_APPROVAL}
               component={BiometricApprovalScreen}
@@ -108,7 +113,6 @@ export const AppNavigator: React.FC = () => {
               }}
             />
 
-            {/* Módulo de Tickets */}
             {canAccessTickets() && (
               <>
                 <Stack.Screen
@@ -126,19 +130,15 @@ export const AppNavigator: React.FC = () => {
               </>
             )}
 
-            {/* Módulo de Pedidos */}
             {canAccessOrders() && (
               <>
-                {/* Lista de Pedidos */}
                 <Stack.Screen name={routes.PEDIDOS} component={PedidosScreen} />
 
-                {/* Detalhes do Pedido */}
                 <Stack.Screen
                   name={routes.PEDIDO_DETALHES}
                   component={PedidoDetalhesScreen}
                 />
 
-                {/* Criar Pedido (Modal) */}
                 <Stack.Screen
                   name={routes.CRIAR_PEDIDO}
                   component={CriarPedidoScreen}
@@ -148,7 +148,6 @@ export const AppNavigator: React.FC = () => {
                   }}
                 />
 
-                {/* Recusar Pedido (Modal) */}
                 <Stack.Screen
                   name={routes.RECUSAR_PEDIDO}
                   component={RecusarPedidoScreen}
@@ -158,7 +157,6 @@ export const AppNavigator: React.FC = () => {
                   }}
                 />
 
-                {/* Cancelar Pedido (Modal) */}
                 <Stack.Screen
                   name={routes.CANCELAR_PEDIDO}
                   component={CancelarPedidoScreen}
@@ -168,7 +166,6 @@ export const AppNavigator: React.FC = () => {
                   }}
                 />
 
-                {/* QR Code do Pedido (Modal) */}
                 <Stack.Screen
                   name={routes.QR_CODE}
                   component={QRCodeScreen}
@@ -178,7 +175,6 @@ export const AppNavigator: React.FC = () => {
                   }}
                 />
 
-                {/* Scanner de QR Code (Fullscreen Modal) */}
                 <Stack.Screen
                   name={routes.QR_SCANNER}
                   component={QRScannerScreen}
@@ -188,16 +184,24 @@ export const AppNavigator: React.FC = () => {
                   }}
                 />
 
-                {/* Entregar Itens do Pedido */}
                 <Stack.Screen
                   name={routes.ENTREGAR_ITENS}
                   component={EntregarItensScreen}
+                />
+
+                {/* ✅ NOVA ROTA: Scan de Ticket Avulso */}
+                <Stack.Screen
+                  name={routes.SCAN_TICKET_AVULSO}
+                  component={ScanTicketAvulsoScreen}
+                  options={{
+                    presentation: "fullScreenModal",
+                    animation: "slide_from_bottom",
+                  }}
                 />
               </>
             )}
           </>
         ) : (
-          /* Tela de Login */
           <Stack.Screen name={routes.SIGN_IN} component={SignInScreen} />
         )}
       </Stack.Navigator>

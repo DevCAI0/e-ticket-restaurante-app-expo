@@ -38,53 +38,181 @@ export const FacialResult: React.FC<FacialResultProps> = ({
   onClose,
   onRetry,
 }) => {
+  const renderMessage = () => {
+    // Detectar mensagens de horário - MUITO CEDO
+    if (
+      message.includes("Muito cedo") ||
+      message.includes("Horário disponível")
+    ) {
+      return (
+        <View style={styles.messageContainer}>
+          <View style={styles.messageIconContainer}>
+            <Ionicons name="time-outline" size={32} color={colors.warning} />
+          </View>
+          <Text style={styles.messageWarning}>{message}</Text>
+          <View style={styles.messageHint}>
+            <Ionicons
+              name="information-circle"
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={styles.messageHintText}>
+              Aguarde até o horário de início para consumir esta liberação
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Detectar mensagens de horário - EXPIRADO
+    if (message.includes("expirada") || message.includes("Horário era até")) {
+      return (
+        <View style={styles.messageContainer}>
+          <View style={styles.messageIconContainer}>
+            <Ionicons
+              name="time-outline"
+              size={32}
+              color={colors.destructive.light}
+            />
+          </View>
+          <Text style={styles.messageError}>{message}</Text>
+          <View style={[styles.messageHint, styles.messageHintError]}>
+            <Ionicons
+              name="alert-circle"
+              size={16}
+              color={colors.destructive.light}
+            />
+            <Text style={styles.messageHintTextError}>
+              O horário para consumir esta liberação já passou
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Detectar mensagens de horário - INDISPONÍVEL
+    if (message.includes("indisponível neste momento")) {
+      return (
+        <View style={styles.messageContainer}>
+          <View style={styles.messageIconContainer}>
+            <Ionicons name="ban" size={32} color={colors.muted.light} />
+          </View>
+          <Text style={styles.message}>{message}</Text>
+          <View style={styles.messageHint}>
+            <Ionicons
+              name="information-circle"
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={styles.messageHintText}>
+              Verifique os horários disponíveis para cada tipo de refeição
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Mensagem de sem liberações
+    if (message.includes("mas não possui liberações disponíveis")) {
+      const parts = message.split("mas não possui liberações disponíveis");
+      return (
+        <View style={styles.messageContainer}>
+          <Text style={styles.message}>
+            {parts[0]}
+            <Text style={styles.messageWarning}>
+              mas não possui liberações disponíveis
+            </Text>
+            {parts[1]}
+          </Text>
+        </View>
+      );
+    }
+
+    return <Text style={styles.message}>{message}</Text>;
+  };
+
+  // Detectar se é erro de horário para ajustar estilo do card
+  const isTimeError =
+    message.includes("Muito cedo") ||
+    message.includes("expirada") ||
+    message.includes("indisponível neste momento");
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
       <View
-        style={[styles.card, success ? styles.cardSuccess : styles.cardError]}
+        style={[
+          styles.card,
+          success
+            ? styles.cardSuccess
+            : isTimeError
+              ? styles.cardWarning
+              : styles.cardError,
+        ]}
       >
-        {/* Ícone de Resultado */}
         <View style={styles.iconContainer}>
           <View
             style={[
               styles.iconBackground,
               success
                 ? styles.iconBackgroundSuccess
-                : styles.iconBackgroundError,
+                : isTimeError
+                  ? styles.iconBackgroundWarning
+                  : styles.iconBackgroundError,
             ]}
           >
             <View
               style={[
                 styles.iconCircle,
-                success ? styles.iconCircleSuccess : styles.iconCircleError,
+                success
+                  ? styles.iconCircleSuccess
+                  : isTimeError
+                    ? styles.iconCircleWarning
+                    : styles.iconCircleError,
               ]}
             >
               <Ionicons
-                name={success ? "checkmark-circle" : "close-circle"}
+                name={
+                  success
+                    ? "checkmark-circle"
+                    : isTimeError
+                      ? "time"
+                      : "close-circle"
+                }
                 size={80}
-                color={success ? colors.success : colors.destructive.light}
+                color={
+                  success
+                    ? colors.success
+                    : isTimeError
+                      ? colors.warning
+                      : colors.destructive.light
+                }
               />
             </View>
           </View>
         </View>
 
-        {/* Título */}
         <Text
           style={[
             styles.title,
-            success ? styles.titleSuccess : styles.titleError,
+            success
+              ? styles.titleSuccess
+              : isTimeError
+                ? styles.titleWarning
+                : styles.titleError,
           ]}
         >
-          {success ? "Verificação Bem-Sucedida!" : "Verificação Falhou"}
+          {success
+            ? "Verificação Bem-Sucedida!"
+            : isTimeError
+              ? "Fora do Horário"
+              : "Verificação Falhou"}
         </Text>
 
-        {/* Mensagem */}
-        <Text style={styles.message}>{message}</Text>
+        {renderMessage()}
 
-        {/* Informações de Sucesso */}
         {success && funcionarioNome && (
           <View style={styles.infoBox}>
             <View style={styles.infoRow}>
@@ -94,18 +222,6 @@ export const FacialResult: React.FC<FacialResultProps> = ({
                 <Text style={styles.infoValue}>{funcionarioNome}</Text>
               </View>
             </View>
-
-            {similaridade !== undefined && (
-              <View style={styles.infoRow}>
-                <Ionicons name="analytics" size={20} color={colors.primary} />
-                <View style={styles.infoTextContainer}>
-                  <Text style={styles.infoLabel}>Similaridade:</Text>
-                  <Text style={styles.infoValue}>
-                    {(similaridade * 100).toFixed(1)}%
-                  </Text>
-                </View>
-              </View>
-            )}
 
             {tempoProcessamento !== undefined && (
               <View style={styles.infoRow}>
@@ -121,7 +237,6 @@ export const FacialResult: React.FC<FacialResultProps> = ({
           </View>
         )}
 
-        {/* Imagens */}
         {(capturedImage || referenceImage) && (
           <View style={styles.imagesContainer}>
             <Text style={styles.imagesTitle}>Imagens Utilizadas</Text>
@@ -135,7 +250,9 @@ export const FacialResult: React.FC<FacialResultProps> = ({
                       styles.imageWrapper,
                       success
                         ? styles.imageWrapperSuccess
-                        : styles.imageWrapperError,
+                        : isTimeError
+                          ? styles.imageWrapperWarning
+                          : styles.imageWrapperError,
                     ]}
                   >
                     <Image
@@ -147,11 +264,15 @@ export const FacialResult: React.FC<FacialResultProps> = ({
                         styles.imageBadge,
                         success
                           ? styles.imageBadgeSuccess
-                          : styles.imageBadgeError,
+                          : isTimeError
+                            ? styles.imageBadgeWarning
+                            : styles.imageBadgeError,
                       ]}
                     >
                       <Ionicons
-                        name={success ? "checkmark" : "close"}
+                        name={
+                          success ? "checkmark" : isTimeError ? "time" : "close"
+                        }
                         size={16}
                         color="#ffffff"
                       />
@@ -182,7 +303,6 @@ export const FacialResult: React.FC<FacialResultProps> = ({
           </View>
         )}
 
-        {/* Botões */}
         <View style={styles.buttonContainer}>
           {!success && onRetry && (
             <Button onPress={onRetry} variant="outline" style={styles.button}>
@@ -195,7 +315,13 @@ export const FacialResult: React.FC<FacialResultProps> = ({
 
           <Button
             onPress={onClose}
-            style={success ? styles.buttonSuccess : styles.buttonError}
+            style={
+              success
+                ? styles.buttonSuccess
+                : isTimeError
+                  ? styles.buttonWarning
+                  : styles.buttonError
+            }
           >
             <Text style={styles.closeButtonText}>
               {success ? "Continuar" : "Fechar"}
@@ -232,6 +358,9 @@ const styles = StyleSheet.create({
   cardSuccess: {
     backgroundColor: "#F0FDF4",
   },
+  cardWarning: {
+    backgroundColor: "#FFFBEB",
+  },
   cardError: {
     backgroundColor: "#FEF2F2",
   },
@@ -248,6 +377,9 @@ const styles = StyleSheet.create({
   iconBackgroundSuccess: {
     backgroundColor: "#DCFCE7",
   },
+  iconBackgroundWarning: {
+    backgroundColor: "#FEF3C7",
+  },
   iconBackgroundError: {
     backgroundColor: "#FEE2E2",
   },
@@ -261,6 +393,9 @@ const styles = StyleSheet.create({
   iconCircleSuccess: {
     backgroundColor: "#BBF7D0",
   },
+  iconCircleWarning: {
+    backgroundColor: "#FDE68A",
+  },
   iconCircleError: {
     backgroundColor: "#FECACA",
   },
@@ -273,6 +408,9 @@ const styles = StyleSheet.create({
   titleSuccess: {
     color: "#166534",
   },
+  titleWarning: {
+    color: "#92400E",
+  },
   titleError: {
     color: "#991B1B",
   },
@@ -281,6 +419,54 @@ const styles = StyleSheet.create({
     color: colors.text.light,
     textAlign: "center",
     marginBottom: 24,
+    lineHeight: 24,
+  },
+  messageContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 24,
+    gap: 12,
+  },
+  messageIconContainer: {
+    marginBottom: 8,
+  },
+  messageWarning: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.warning,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  messageError: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.destructive.light,
+    textAlign: "center",
+    lineHeight: 24,
+  },
+  messageHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.primary + "10",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary + "30",
+  },
+  messageHintError: {
+    backgroundColor: colors.destructive.light + "10",
+    borderColor: colors.destructive.light + "30",
+  },
+  messageHintText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.primary,
+    lineHeight: 18,
+  },
+  messageHintTextError: {
+    color: colors.destructive.light,
   },
   infoBox: {
     width: "100%",
@@ -346,6 +532,10 @@ const styles = StyleSheet.create({
     borderColor: colors.success,
     backgroundColor: "#DCFCE7",
   },
+  imageWrapperWarning: {
+    borderColor: colors.warning,
+    backgroundColor: "#FEF3C7",
+  },
   imageWrapperError: {
     borderColor: colors.destructive.light,
     backgroundColor: "#FEE2E2",
@@ -376,6 +566,9 @@ const styles = StyleSheet.create({
   imageBadgeSuccess: {
     backgroundColor: colors.success,
   },
+  imageBadgeWarning: {
+    backgroundColor: colors.warning,
+  },
   imageBadgeError: {
     backgroundColor: colors.destructive.light,
   },
@@ -399,6 +592,9 @@ const styles = StyleSheet.create({
   },
   buttonSuccess: {
     backgroundColor: colors.success,
+  },
+  buttonWarning: {
+    backgroundColor: colors.warning,
   },
   buttonError: {
     backgroundColor: colors.destructive.light,

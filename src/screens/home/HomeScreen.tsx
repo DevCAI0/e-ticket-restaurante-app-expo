@@ -74,6 +74,8 @@ export const HomeScreen: React.FC = () => {
     if (tab === "pedidos") {
       markAsViewed(); // Marca notificações como vistas
       navigation.navigate("Pedidos");
+    } else if (tab === "ajustes") {
+      navigation.navigate("Ajustes");
     }
     // Adicione outras navegações conforme necessário
   };

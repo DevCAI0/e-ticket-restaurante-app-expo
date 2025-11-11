@@ -83,6 +83,31 @@ export const entregarItemFuncionario = async (
   }
 };
 
+export const validarTicketAvulso = async (
+  pedidoId: number,
+  itemId: number,
+  token: string
+): Promise<any> => {
+  try {
+    const response = await api.post(
+      `/restaurante-pedidos/${pedidoId}/itens/${itemId}/validar-ticket-avulso`,
+      { token }
+    );
+
+    if (!response.data.success) {
+      throw new Error(response.data.error || "Erro ao validar ticket avulso");
+    }
+
+    return response.data;
+  } catch (error: any) {
+    throw new Error(
+      error.response?.data?.error ||
+        error.message ||
+        "Erro ao validar ticket avulso"
+    );
+  }
+};
+
 export const entregarItemAvulso = async (
   pedidoId: number,
   itemId: number,
@@ -280,6 +305,7 @@ export const PedidosAPI = {
   listarRestaurantesDisponiveis,
   criarPedido,
   entregarItemFuncionario,
+  validarTicketAvulso,
   entregarItemAvulso,
   obterQRCode,
 
