@@ -1,4 +1,4 @@
-// src/components/common/BottomNav.tsx - Atualizado com permissões e safe area
+// src/components/common/BottomNav.tsx - Atualizado com navegação para tickets
 import React, { useMemo } from "react";
 import {
   View,
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -4,
     right: -10,
-    backgroundColor: colors.destructive,
+    backgroundColor: colors.destructive.light,
     borderRadius: 10,
     minWidth: 20,
     height: 20,

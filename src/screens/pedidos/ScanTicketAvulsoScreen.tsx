@@ -1,4 +1,3 @@
-// src/screens/pedidos/ScanTicketAvulsoScreen.tsx - ✅ VERSÃO ATUALIZADA COM SCROLL
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -6,7 +5,6 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Alert,
   Vibration,
   Modal,
   ActivityIndicator,
@@ -39,10 +37,11 @@ export function ScanTicketAvulsoScreen({
   const [scanned, setScanned] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
-  const [manualToken, setManualToken] = useState("");
+  const [manualNumero, setManualNumero] = useState("");
+  const [manualCodigo, setManualCodigo] = useState("");
   const [showValidationDetails, setShowValidationDetails] = useState(false);
   const [validatedTicket, setValidatedTicket] = useState<any>(null);
-  const [tokenEditavel, setTokenEditavel] = useState("");
+  const [qrCodeOriginal, setQrCodeOriginal] = useState("");
 
   useEffect(() => {
     requestCameraPermission();
@@ -53,11 +52,17 @@ export function ScanTicketAvulsoScreen({
     setHasPermission(status === "granted");
   };
 
-  const validarTicketAvulso = async (token: string) => {
+  const validarTicketAvulso = async (numero: string, codigo?: string) => {
     try {
+      const payload: any = { numero };
+
+      if (codigo) {
+        payload.codigo = codigo;
+      }
+
       const response = await api.post(
         `/restaurante-pedidos/${pedidoId}/itens/${itemId}/validar-ticket-avulso`,
-        { token }
+        payload
       );
 
       if (response.data.success) {
@@ -73,7 +78,7 @@ export function ScanTicketAvulsoScreen({
   };
 
   const consumirTicket = async () => {
-    if (!validatedTicket || !tokenEditavel.trim()) return;
+    if (!validatedTicket || !qrCodeOriginal.trim()) return;
 
     try {
       setProcessing(true);
@@ -83,7 +88,7 @@ export function ScanTicketAvulsoScreen({
         {
           nome: validatedTicket.nome,
           cpf: validatedTicket.cpf,
-          token: tokenEditavel.trim(), // ✅ Usar o token editável
+          numero: qrCodeOriginal.trim(),
           observacao: `Ticket ${validatedTicket.numero} validado e consumido via QR Code`,
         }
       );
@@ -91,12 +96,10 @@ export function ScanTicketAvulsoScreen({
       if (response.data.success) {
         showSuccessToast("Ticket consumido com sucesso!");
 
-        // Chamar callback de sucesso se existir
         if (onSuccess) {
           onSuccess(validatedTicket);
         }
 
-        // Voltar para tela anterior
         navigation.goBack();
       } else {
         throw new Error(response.data.error || "Erro ao consumir ticket");
@@ -120,21 +123,11 @@ export function ScanTicketAvulsoScreen({
     Vibration.vibrate(100);
 
     try {
-      // Extrair token do QR Code (pode estar em formato JSON ou direto)
-      let token = data;
-      try {
-        const parsed = JSON.parse(data);
-        token = parsed.token || parsed.numero || data;
-      } catch {
-        // Se não for JSON, usar o valor direto
-        token = data;
-      }
+      setQrCodeOriginal(data);
 
-      const ticketData = await validarTicketAvulso(token);
+      const ticketData = await validarTicketAvulso(data);
 
-      // ✅ Mostrar detalhes da validação antes de confirmar
       setValidatedTicket(ticketData.ticket);
-      setTokenEditavel(ticketData.ticket.token || ticketData.ticket.codigo); // ✅ Preencher com o token/código validado
       setShowValidationDetails(true);
       Vibration.vibrate([100, 50, 100]);
     } catch (error: any) {
@@ -145,9 +138,9 @@ export function ScanTicketAvulsoScreen({
     }
   };
 
-  const handleManualTokenSubmit = async () => {
-    if (!manualToken.trim()) {
-      showErrorToast("Digite o token do ticket");
+  const handleManualSubmit = async () => {
+    if (!manualNumero.trim() || !manualCodigo.trim()) {
+      showErrorToast("Preencha o número E o código do ticket");
       return;
     }
 
@@ -155,23 +148,28 @@ export function ScanTicketAvulsoScreen({
     setProcessing(true);
 
     try {
-      const ticketData = await validarTicketAvulso(manualToken.trim());
+      const combinedData = `${manualNumero.trim()}|${manualCodigo.trim()}`;
+      setQrCodeOriginal(combinedData);
 
-      // ✅ Mostrar detalhes da validação
+      const ticketData = await validarTicketAvulso(
+        manualNumero.trim(),
+        manualCodigo.trim()
+      );
+
       setValidatedTicket(ticketData.ticket);
-      setTokenEditavel(ticketData.ticket.token || ticketData.ticket.codigo); // ✅ Preencher com o token/código validado
       setShowValidationDetails(true);
     } catch (error: any) {
       showErrorToast(error.message || "Erro ao validar ticket");
     } finally {
       setProcessing(false);
-      setManualToken("");
+      setManualNumero("");
+      setManualCodigo("");
     }
   };
 
   const handleConfirmValidation = async () => {
-    if (!validatedTicket || !tokenEditavel.trim()) {
-      showErrorToast("Token do ticket é obrigatório");
+    if (!validatedTicket || !qrCodeOriginal.trim()) {
+      showErrorToast("Dados do ticket inválidos");
       return;
     }
 
@@ -181,7 +179,7 @@ export function ScanTicketAvulsoScreen({
   const handleCancelValidation = () => {
     setShowValidationDetails(false);
     setValidatedTicket(null);
-    setTokenEditavel("");
+    setQrCodeOriginal("");
     setScanned(false);
   };
 
@@ -222,9 +220,11 @@ export function ScanTicketAvulsoScreen({
                       Número do Ticket
                     </Text>
                   </View>
-                  <Text style={styles.validationItemValue}>
-                    {validatedTicket.numero || validatedTicket.codigo}
-                  </Text>
+                  <View style={styles.numeroDisplayBox}>
+                    <Text style={styles.numeroDisplayText}>
+                      {validatedTicket.numero}
+                    </Text>
+                  </View>
                 </View>
 
                 <View style={styles.validationDivider} />
@@ -233,21 +233,14 @@ export function ScanTicketAvulsoScreen({
                   <View style={styles.validationItemHeader}>
                     <Ionicons name="key" size={20} color={colors.primary} />
                     <Text style={styles.validationItemTitle}>
-                      Token/Código do Ticket
+                      Código do Ticket
                     </Text>
                   </View>
-                  <TextInput
-                    style={styles.tokenEditInput}
-                    value={tokenEditavel}
-                    onChangeText={setTokenEditavel}
-                    placeholder="Token será preenchido automaticamente"
-                    placeholderTextColor={colors.muted.light}
-                    autoCapitalize="characters"
-                  />
-                  <Text style={styles.tokenHint}>
-                    ✅ Token preenchido automaticamente - Você pode editá-lo se
-                    necessário
-                  </Text>
+                  <View style={styles.numeroDisplayBox}>
+                    <Text style={styles.numeroDisplayText}>
+                      {validatedTicket.codigo}
+                    </Text>
+                  </View>
                 </View>
 
                 <View style={styles.validationDivider} />
@@ -261,25 +254,6 @@ export function ScanTicketAvulsoScreen({
                     {validatedTicket.nome}
                   </Text>
                 </View>
-
-                {validatedTicket.cpf_formatado && (
-                  <>
-                    <View style={styles.validationDivider} />
-                    <View style={styles.validationItem}>
-                      <View style={styles.validationItemHeader}>
-                        <Ionicons
-                          name="card"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={styles.validationItemTitle}>CPF</Text>
-                      </View>
-                      <Text style={styles.validationItemValue}>
-                        {validatedTicket.cpf_formatado}
-                      </Text>
-                    </View>
-                  </>
-                )}
 
                 <View style={styles.validationDivider} />
 
@@ -372,11 +346,11 @@ export function ScanTicketAvulsoScreen({
             <TouchableOpacity
               style={[
                 styles.confirmValidationButton,
-                (!tokenEditavel.trim() || processing) &&
+                (!qrCodeOriginal.trim() || processing) &&
                   styles.confirmValidationButtonDisabled,
               ]}
               onPress={handleConfirmValidation}
-              disabled={!tokenEditavel.trim() || processing}
+              disabled={!qrCodeOriginal.trim() || processing}
             >
               {processing ? (
                 <ActivityIndicator
@@ -402,7 +376,7 @@ export function ScanTicketAvulsoScreen({
     </Modal>
   );
 
-  const renderManualTokenModal = () => (
+  const renderManualModal = () => (
     <Modal
       visible={showManualModal}
       transparent
@@ -412,11 +386,12 @@ export function ScanTicketAvulsoScreen({
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Digitar Token Manualmente</Text>
+            <Text style={styles.modalTitle}>Digitar Manualmente</Text>
             <TouchableOpacity
               onPress={() => {
                 setShowManualModal(false);
-                setManualToken("");
+                setManualNumero("");
+                setManualCodigo("");
               }}
               style={styles.modalCloseButton}
             >
@@ -425,15 +400,31 @@ export function ScanTicketAvulsoScreen({
           </View>
 
           <View style={styles.modalBody}>
-            <Text style={styles.inputLabel}>Token do Ticket Avulso</Text>
+            <Text style={styles.requiredFieldsNote}>
+              ⚠️ Ambos os campos são obrigatórios
+            </Text>
+
+            <Text style={styles.inputLabel}>Número do Ticket *</Text>
+            <Text style={styles.inputHint}>Digite o número (ex: AV50029)</Text>
             <TextInput
-              style={styles.tokenInput}
-              placeholder="Digite o token (ex: AV12345 ou código)"
+              style={styles.numeroInput}
+              placeholder="AV50029"
               placeholderTextColor={colors.muted.light}
-              value={manualToken}
-              onChangeText={setManualToken}
+              value={manualNumero}
+              onChangeText={setManualNumero}
               autoCapitalize="characters"
               autoFocus
+            />
+
+            <Text style={styles.inputLabel}>Código do Ticket *</Text>
+            <Text style={styles.inputHint}>Digite o código (ex: 352077)</Text>
+            <TextInput
+              style={styles.numeroInput}
+              placeholder="352077"
+              placeholderTextColor={colors.muted.light}
+              value={manualCodigo}
+              onChangeText={setManualCodigo}
+              keyboardType="numeric"
             />
 
             <View style={styles.modalFooter}>
@@ -441,7 +432,8 @@ export function ScanTicketAvulsoScreen({
                 style={styles.cancelModalButton}
                 onPress={() => {
                   setShowManualModal(false);
-                  setManualToken("");
+                  setManualNumero("");
+                  setManualCodigo("");
                 }}
               >
                 <Text style={styles.cancelModalButtonText}>Cancelar</Text>
@@ -450,11 +442,15 @@ export function ScanTicketAvulsoScreen({
               <TouchableOpacity
                 style={[
                   styles.confirmModalButton,
-                  (!manualToken.trim() || processing) &&
+                  (!manualNumero.trim() ||
+                    !manualCodigo.trim() ||
+                    processing) &&
                     styles.confirmModalButtonDisabled,
                 ]}
-                onPress={handleManualTokenSubmit}
-                disabled={!manualToken.trim() || processing}
+                onPress={handleManualSubmit}
+                disabled={
+                  !manualNumero.trim() || !manualCodigo.trim() || processing
+                }
               >
                 {processing ? (
                   <ActivityIndicator
@@ -602,7 +598,7 @@ export function ScanTicketAvulsoScreen({
         </View>
       </View>
 
-      {renderManualTokenModal()}
+      {renderManualModal()}
       {renderValidationDetailsModal()}
     </SafeAreaView>
   );
@@ -811,9 +807,9 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: colors.card.light,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 32,
+    borderRadius: 24,
+    width: "90%",
+    maxWidth: 400,
   },
   modalHeader: {
     flexDirection: "row",
@@ -834,13 +830,28 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: 20,
   },
+  requiredFieldsNote: {
+    fontSize: 13,
+    color: colors.warning || "#f59e0b",
+    backgroundColor: (colors.warning || "#f59e0b") + "15",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    textAlign: "center",
+    fontWeight: "600",
+  },
   inputLabel: {
     fontSize: 14,
     fontWeight: "600",
     color: colors.text.light,
+    marginBottom: 8,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: colors.muted.light,
     marginBottom: 12,
   },
-  tokenInput: {
+  numeroInput: {
     backgroundColor: colors.border.light,
     borderRadius: 12,
     paddingHorizontal: 20,
@@ -849,11 +860,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.text.light,
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: 16,
   },
   modalFooter: {
     flexDirection: "row",
     gap: 12,
+    marginTop: 8,
   },
   cancelModalButton: {
     flex: 1,
@@ -919,9 +931,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 20,
   },
-  validationContent: {
-    padding: 20,
-  },
   validationItem: {
     marginBottom: 16,
   },
@@ -942,22 +951,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.text.light,
   },
-  tokenEditInput: {
-    backgroundColor: colors.border.light,
+  numeroDisplayBox: {
+    backgroundColor: colors.success + "10",
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    borderWidth: 2,
+    borderColor: colors.success,
+  },
+  numeroDisplayText: {
     fontSize: 16,
     fontWeight: "600",
     color: colors.text.light,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  tokenHint: {
-    fontSize: 11,
-    color: colors.muted.light,
-    marginTop: 6,
-    fontStyle: "italic",
+    textAlign: "center",
   },
   validationDivider: {
     height: 1,

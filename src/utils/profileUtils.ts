@@ -1,4 +1,3 @@
-// src/utils/profileUtils.ts
 import { User } from "../types/user";
 
 export interface ProfilePermissions {
@@ -18,71 +17,39 @@ export function createProfilePermissions(
   user: User | null
 ): ProfilePermissions {
   const hasProfile = (profileId: number): boolean => {
-    const result = user?.id_perfil === profileId;
-    console.log(
-      `🔐 [PROFILE] hasProfile(${profileId}):`,
-      result,
-      "| user.id_perfil:",
-      user?.id_perfil
-    );
-    return result;
+    return user?.id_perfil === profileId;
   };
 
   const hasAnyProfile = (profileIds: number[]): boolean => {
-    const result = profileIds.includes(user?.id_perfil || 0);
-    console.log(`🔐 [PROFILE] hasAnyProfile([${profileIds}]):`, result);
-    return result;
+    return profileIds.includes(user?.id_perfil || 0);
   };
 
   const isEstablishment = (): boolean => {
-    const result = user?.id_perfil === 1;
-    console.log(
-      "🔐 [PROFILE] isEstablishment():",
-      result,
-      "| user.id_perfil:",
-      user?.id_perfil
-    );
-    return result;
+    return user?.id_perfil === 1;
   };
 
   const isRestaurant = (): boolean => {
-    const result = user?.id_restaurante !== null;
-    console.log(
-      "🔐 [PROFILE] isRestaurant():",
-      result,
-      "| user.id_restaurante:",
-      user?.id_restaurante
-    );
-    return result;
+    return user?.id_restaurante !== null;
   };
 
   const isRestaurantManager = (): boolean => {
-    const result = user?.id_perfil === 3;
-    console.log("🔐 [PROFILE] isRestaurantManager():", result);
-    return result;
+    return user?.id_perfil === 3;
   };
 
   const canAccessTickets = (): boolean => {
-    const result = !isEstablishment();
-    console.log("🔐 [PROFILE] canAccessTickets():", result);
-    return result;
+    return !isEstablishment();
   };
 
   const canAccessNotes = (): boolean => {
-    const result = user?.id_perfil === 3;
-    console.log("🔐 [PROFILE] canAccessNotes():", result);
-    return result;
+    return user?.id_perfil === 3;
   };
 
   const canAccessOrders = (): boolean => {
-    console.log("🔐 [PROFILE] canAccessOrders(): true (todos podem)");
     return true;
   };
 
   const hasPermission = (permission: string): boolean => {
-    const result = user?.permissions?.[permission] === "1";
-    console.log(`🔐 [PROFILE] hasPermission(${permission}):`, result);
-    return result;
+    return user?.permissions?.[permission] === "1";
   };
 
   return {
@@ -99,7 +66,6 @@ export function createProfilePermissions(
   };
 }
 
-// Helpers individuais para uso direto (sem hook)
 export function isEstablishment(user: User | null): boolean {
   return user?.id_perfil === 1;
 }

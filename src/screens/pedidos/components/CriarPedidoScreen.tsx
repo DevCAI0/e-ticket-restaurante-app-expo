@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../../constants/colors";
 import { showSuccessToast, showErrorToast } from "../../../lib/toast";
 import { useAuth } from "../../../hooks/useAuth";
+import { useHorarioNotificacoes } from "../../../hooks/useHorarioNotificacoes";
 import { PedidosAPI } from "../../../api/pedidos";
 
 interface CriarPedidoScreenProps {
@@ -31,6 +32,10 @@ interface TipoRefeicaoDisponivel {
   quota_total: number;
   quota_utilizada: number;
   quota_disponivel: number;
+  horario_inicio?: string;
+  horario_fim?: string;
+  disponivel_de?: string; // 1 hora antes do início
+  disponivel_ate?: string; // horário fim
 }
 
 interface Restaurante {
@@ -46,12 +51,15 @@ export function CriarPedidoScreen({
   route,
 }: CriarPedidoScreenProps) {
   const { user } = useAuth();
+  const { verificarHorariosDisponiveis } = useHorarioNotificacoes();
+
   const [restaurantes, setRestaurantes] = useState<Restaurante[]>([]);
   const [loadingRestaurantes, setLoadingRestaurantes] = useState(true);
   const [selectedRestaurante, setSelectedRestaurante] =
     useState<Restaurante | null>(null);
   const [selectedTipoRefeicao, setSelectedTipoRefeicao] =
     useState<TipoRefeicaoDisponivel | null>(null);
+  const [horaAtual, setHoraAtual] = useState("");
 
   const [showRestauranteModal, setShowRestauranteModal] = useState(false);
   const [showTipoRefeicaoModal, setShowTipoRefeicaoModal] = useState(false);
@@ -64,6 +72,19 @@ export function CriarPedidoScreen({
 
   useEffect(() => {
     loadRestaurantes();
+
+    // Atualizar hora atual a cada minuto
+    const updateTime = () => {
+      const now = new Date();
+      setHoraAtual(
+        now.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+      );
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 60000); // 1 minuto
+
+    return () => clearInterval(interval);
   }, []);
 
   const loadRestaurantes = async () => {
@@ -73,8 +94,14 @@ export function CriarPedidoScreen({
 
       if (response.success && response.data?.restaurantes) {
         setRestaurantes(response.data.restaurantes);
+
+        // Se houver hora_atual na resposta, usar ela
+        if (response.data.hora_atual) {
+          const [hora, minuto] = response.data.hora_atual.split(":");
+          setHoraAtual(`${hora}:${minuto}`);
+        }
       } else {
-        throw new Error("Nenhum restaurante disponível");
+        throw new Error("Nenhum restaurante disponível no momento");
       }
     } catch (error: any) {
       console.error("Erro ao carregar restaurantes:", error);
@@ -205,7 +232,10 @@ export function CriarPedidoScreen({
                 color={colors.muted.light}
               />
               <Text style={styles.modalEmptyText}>
-                Nenhum restaurante disponível com quotas ativas
+                Nenhum restaurante disponível com quotas ativas no momento
+              </Text>
+              <Text style={styles.modalEmptyHint}>
+                Horário atual: {horaAtual}
               </Text>
             </View>
           ) : (
@@ -240,8 +270,8 @@ export function CriarPedidoScreen({
                       </Text>
                     )}
                     <Text style={styles.modalItemInfo}>
-                      {restaurante.tipos_refeicao_disponiveis.length} tipo(s) de
-                      refeição
+                      {restaurante.tipos_refeicao_disponiveis.length} tipo(s)
+                      disponível(is) agora
                     </Text>
                   </View>
                   {selectedRestaurante?.id === restaurante.id && (
@@ -347,6 +377,20 @@ export function CriarPedidoScreen({
                           ]}
                         />
                       </View>
+
+                      {tipo.disponivel_de && tipo.disponivel_ate && (
+                        <View style={styles.horarioInfo}>
+                          <Ionicons
+                            name="time-outline"
+                            size={14}
+                            color={colors.primary}
+                          />
+                          <Text style={styles.horarioText}>
+                            Pedidos: {tipo.disponivel_de} até{" "}
+                            {tipo.disponivel_ate}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     {tipo.quota_disponivel === 0 && (
@@ -389,9 +433,17 @@ export function CriarPedidoScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>
-            {user?.nome_estabelecimento || "ESTABELECIMENTO"}
-          </Text>
+          <View style={styles.infoCardHeader}>
+            <Text style={styles.infoTitle}>
+              {user?.nome_estabelecimento || "ESTABELECIMENTO"}
+            </Text>
+            {horaAtual && (
+              <View style={styles.timeChip}>
+                <Ionicons name="time" size={14} color={colors.primary} />
+                <Text style={styles.timeChipText}>{horaAtual}</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.infoDescription}>
             Selecione o restaurante, tipo de refeição e quantidade de tickets
             para criar o pedido.
@@ -461,6 +513,22 @@ export function CriarPedidoScreen({
                 color={colors.muted.light}
               />
             </TouchableOpacity>
+
+            {selectedTipoRefeicao?.disponivel_de &&
+              selectedTipoRefeicao?.disponivel_ate && (
+                <View style={styles.horarioCard}>
+                  <Ionicons
+                    name="information-circle"
+                    size={16}
+                    color={colors.info}
+                  />
+                  <Text style={styles.horarioCardText}>
+                    Você pode fazer pedidos de{" "}
+                    {selectedTipoRefeicao.disponivel_de} até{" "}
+                    {selectedTipoRefeicao.disponivel_ate}
+                  </Text>
+                </View>
+              )}
           </View>
         )}
 
@@ -650,11 +718,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.primary + "30",
   },
+  infoCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   infoTitle: {
     fontSize: 16,
     fontWeight: "700",
     color: colors.text.light,
-    marginBottom: 8,
+    flex: 1,
+  },
+  timeChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.background.light,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  timeChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.primary,
   },
   infoDescription: {
     fontSize: 14,
@@ -708,6 +796,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     color: colors.success,
+  },
+  horarioCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.info + "10",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  horarioCardText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.info,
+    lineHeight: 16,
   },
   quantidadeCard: {
     backgroundColor: colors.card.light,
@@ -890,6 +993,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: "center",
   },
+  modalEmptyHint: {
+    fontSize: 12,
+    color: colors.muted.light,
+    marginTop: 8,
+    textAlign: "center",
+  },
   modalList: {
     maxHeight: 400,
   },
@@ -962,10 +1071,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border.light,
     borderRadius: 3,
     overflow: "hidden",
+    marginBottom: 8,
   },
   quotaBarFill: {
     height: "100%",
     borderRadius: 3,
+  },
+  horarioInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.primary + "10",
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  horarioText: {
+    fontSize: 11,
+    color: colors.primary,
+    fontWeight: "600",
   },
   esgotadoText: {
     fontSize: 11,

@@ -10,6 +10,7 @@ export const routes = {
   SCANNER: "Scanner",
   MANUAL_VERIFICATION: "ManualVerification",
   TICKET_DETAILS: "TicketDetails",
+  TICKETS_LIST: "TicketsList",
   BIOMETRIC_APPROVAL: "BiometricApproval",
 
   // Pedidos
@@ -22,11 +23,11 @@ export const routes = {
   QR_CODE: "QRCode",
   QR_SCANNER: "QRScanner",
   ENTREGAR_ITENS: "EntregarItens",
-  SCAN_TICKET_AVULSO: "ScanTicketAvulso", // ✅ NOVO
+  SCAN_TICKET_AVULSO: "ScanTicketAvulso",
 
   // Outros
   ORDERS: "Orders",
   SETTINGS: "Settings",
-} as const;
+} as const; // ✅ Adicionar 'as const' aqui é CRUCIAL
 
 export type RouteNames = (typeof routes)[keyof typeof routes];

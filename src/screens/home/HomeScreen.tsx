@@ -1,10 +1,8 @@
-// src/screens/home/HomeScreen.tsx
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { View, StyleSheet, ScrollView, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useNavigation, NavigationProp } from "@react-navigation/native";
 import { useAuth } from "../../hooks/useAuth";
 import { useProfilePermissions } from "../../hooks/useProfilePermissions";
 import { usePedidosPendentes } from "../../hooks/usePedidosPendentes";
@@ -16,13 +14,12 @@ import { ActionCard } from "../../components/home/components/ActionCard";
 import { RootStackParamList } from "../../navigation/AppNavigator";
 import { colors } from "../../constants/colors";
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type NavProp = NavigationProp<RootStackParamList>;
 
-export const HomeScreen: React.FC = () => {
-  const navigation = useNavigation<NavigationProp>();
+export default function HomeScreen() {
+  const navigation = useNavigation<NavProp>();
   const { logout } = useAuth();
-  const { isEstablishment, canAccessTickets, canAccessOrders, user } =
-    useProfilePermissions();
+  const { isEstablishment, canAccessTickets, user } = useProfilePermissions();
   const {
     count: pedidosPendentes,
     hasNewOrders,
@@ -30,59 +27,28 @@ export const HomeScreen: React.FC = () => {
   } = usePedidosPendentes();
   const [activeTab, setActiveTab] = useState("home");
 
-  // Log para debug quando o componente montar ou user mudar
-  useEffect(() => {
-    if (user) {
-      console.log("🏠 [HOME] Dados do usuário na HomeScreen:", {
-        id: user.id,
-        nome: user.nome,
-        login: user.login,
-        id_perfil: user.id_perfil,
-        perfil_descricao: user.perfil_descricao,
-        id_estabelecimento: user.id_estabelecimento,
-        nome_estabelecimento: user.nome_estabelecimento,
-        id_restaurante: user.id_restaurante,
-        nome_restaurante: user.nome_restaurante,
-      });
-
-      console.log("🏠 [HOME] Verificações de perfil:", {
-        isEstablishment: isEstablishment(),
-        canAccessTickets: canAccessTickets(),
-        canAccessOrders: canAccessOrders(),
-      });
-
-      if (isEstablishment()) {
-        console.log("🏠 [HOME] 🏢 Renderizando interface de ESTABELECIMENTO");
-      } else {
-        console.log("🏠 [HOME] 🍽️ Renderizando dashboard de RESTAURANTE");
-      }
-    } else {
-      console.log("🏠 [HOME] ⚠️ Usuário não encontrado");
-    }
-  }, [user, isEstablishment, canAccessTickets, canAccessOrders]);
-
   const handleLogout = async () => {
-    console.log("🏠 [HOME] Fazendo logout...");
     await logout();
   };
 
   const handleTabChange = (tab: string) => {
-    console.log("🏠 [HOME] Mudando para tab:", tab);
     setActiveTab(tab);
 
-    // Navegar para a tela correspondente
-    if (tab === "pedidos") {
-      markAsViewed(); // Marca notificações como vistas
-      navigation.navigate("Pedidos");
-    } else if (tab === "ajustes") {
-      navigation.navigate("Ajustes");
+    switch (tab) {
+      case "pedidos":
+        markAsViewed();
+        navigation.navigate("Pedidos");
+        break;
+      case "tickets":
+        navigation.navigate("TicketsList");
+        break;
+      case "ajustes":
+        navigation.navigate("Ajustes");
+        break;
     }
-    // Adicione outras navegações conforme necessário
   };
 
-  // Interface minimalista para estabelecimento (perfil 1)
   if (isEstablishment()) {
-    console.log("🏠 [HOME] ✅ Exibindo tela minimalista para estabelecimento");
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <Header onLogout={handleLogout} />
@@ -109,53 +75,37 @@ export const HomeScreen: React.FC = () => {
     );
   }
 
-  // Dashboard completo para outros perfis (restaurante)
-  console.log("🏠 [HOME] ✅ Exibindo dashboard completo para restaurante");
-
   const getDashboardActions = () => {
-    const actions = [];
+    const actions: Array<{
+      icon: keyof typeof Ionicons.glyphMap;
+      title: string;
+      color: string;
+      onPress: () => void;
+    }> = [];
 
-    // Ações de Tickets - apenas para quem tem permissão
     if (canAccessTickets()) {
-      console.log("🏠 [HOME] Adicionando ações de TICKETS");
       actions.push(
         {
-          icon: "scan" as keyof typeof Ionicons.glyphMap,
+          icon: "scan",
           title: "Ler Tickets",
           color: "#FB923C",
           onPress: () => navigation.navigate("Scanner"),
         },
         {
-          icon: "search" as keyof typeof Ionicons.glyphMap,
+          icon: "search",
           title: "Manualmente",
           color: "#3B82F6",
           onPress: () => navigation.navigate("ManualVerification"),
         },
         {
-          icon: "checkmark-circle" as keyof typeof Ionicons.glyphMap,
+          icon: "checkmark-circle",
           title: "Aprovar Tickets",
           color: "#22C55E",
-          onPress: () => navigation.navigate("BiometricApproval"),
+          onPress: () => navigation.navigate("BiometricApproval", {}),
         }
       );
     }
 
-    // Ação de Pedidos - para quem tem permissão
-    if (canAccessOrders()) {
-      console.log("🏠 [HOME] Adicionando ação de PEDIDOS");
-      actions.push({
-        icon: "receipt" as keyof typeof Ionicons.glyphMap,
-        title: "Ver Pedidos",
-        color: "#F97316",
-        onPress: () => {
-          markAsViewed();
-          navigation.navigate("Pedidos");
-        },
-        badge: pedidosPendentes > 0 ? pedidosPendentes : undefined,
-      });
-    }
-
-    console.log("🏠 [HOME] Total de ações disponíveis:", actions.length);
     return actions;
   };
 
@@ -170,20 +120,19 @@ export const HomeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Mensagem de boas-vindas */}
-        <View style={styles.headerSection}>
-          <Text style={styles.greetingText}>Olá, {user?.nome}!</Text>
-          {user?.nome_restaurante && (
-            <Text style={styles.restaurantName}>{user.nome_restaurante}</Text>
-          )}
+        {/* Nome do Restaurante */}
+        <View style={styles.restaurantHeader}>
+          <Text style={styles.restaurantName}>
+            {user?.nome_restaurante || "Restaurante"}
+          </Text>
         </View>
 
-        {/* Gráfico de Faturamento */}
+        {/* Seção de Resumo */}
         <Card style={styles.chartCard}>
           <EarningsChart />
         </Card>
 
-        {/* Ações disponíveis baseadas em permissões */}
+        {/* Actions Grid */}
         {dashboardActions.length > 0 && (
           <View style={styles.actionsGrid}>
             {dashboardActions.map((action, index) => (
@@ -193,7 +142,6 @@ export const HomeScreen: React.FC = () => {
                 title={action.title}
                 color={action.color}
                 onPress={action.onPress}
-                badge={action.badge}
               />
             ))}
           </View>
@@ -208,7 +156,7 @@ export const HomeScreen: React.FC = () => {
       />
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -220,9 +168,17 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingTop: 8,
     paddingBottom: 32,
   },
-  // Estilos para a interface minimalista (estabelecimento)
+  restaurantHeader: {
+    marginBottom: 16,
+  },
+  restaurantName: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.muted.dark,
+  },
   welcomeContainer: {
     flex: 1,
     justifyContent: "center",
@@ -253,20 +209,6 @@ const styles = StyleSheet.create({
     color: colors.muted.light,
     textAlign: "center",
     lineHeight: 24,
-  },
-  // Estilos para o dashboard completo (restaurante)
-  headerSection: {
-    marginBottom: 16,
-  },
-  greetingText: {
-    fontSize: 24,
-    fontWeight: "600",
-    color: colors.text.dark,
-    marginBottom: 4,
-  },
-  restaurantName: {
-    fontSize: 16,
-    color: colors.muted.dark,
   },
   chartCard: {
     marginBottom: 16,

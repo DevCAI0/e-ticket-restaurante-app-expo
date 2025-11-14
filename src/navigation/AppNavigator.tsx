@@ -4,9 +4,10 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../hooks/useAuth";
 import { useProfilePermissions } from "../hooks/useProfilePermissions";
 import { SignInScreen } from "../screens/auth/SignInScreen";
-import { HomeScreen } from "../screens/home/HomeScreen";
+import HomeScreen from "../screens/home/HomeScreen";
 import { ScannerScreen } from "../screens/tickets/ScannerScreen";
 import { ManualVerificationScreen } from "../screens/tickets/ManualVerificationScreen";
+import { TicketsListScreen } from "../screens/tickets/TicketsListScreen";
 import { BiometricApprovalScreen } from "../screens/facial/BiometricApprovalScreen";
 import { PedidosScreen } from "../screens/pedidos/PedidosScreen";
 import { PedidoDetalhesScreen } from "../screens/pedidos/PedidoDetalhesScreen";
@@ -16,7 +17,7 @@ import { CancelarPedidoScreen } from "../screens/pedidos/components/CancelarPedi
 import { QRCodeScreen } from "../screens/pedidos/QRCodeScreen";
 import { QRScannerScreen } from "../screens/pedidos/QRScannerScreen";
 import { EntregarItensScreen } from "../screens/pedidos/EntregarItensScreen";
-import { ScanTicketAvulsoScreen } from "../screens/pedidos/ScanTicketAvulsoScreen"; // ✅ NOVO
+import { ScanTicketAvulsoScreen } from "../screens/pedidos/ScanTicketAvulsoScreen";
 import { SettingsScreen } from "../screens/settings/SettingsScreen";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { colors } from "../constants/colors";
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   Home: undefined;
   Scanner: undefined;
   ManualVerification: undefined;
+  TicketsList: undefined; // ✅ NOVO
   BiometricApproval: {
     mode?: "pedido" | "avulso";
     pedidoId?: number;
@@ -58,7 +60,6 @@ export type RootStackParamList = {
   EntregarItens: {
     pedidoId: number;
   };
-  // ✅ NOVO: Adicionar tipo para a nova tela
   ScanTicketAvulso: {
     pedidoId: number;
     itemId: number;
@@ -127,6 +128,11 @@ export const AppNavigator: React.FC = () => {
                   name={routes.MANUAL_VERIFICATION}
                   component={ManualVerificationScreen}
                 />
+                {/* ✅ NOVA TELA: Lista de Tickets */}
+                <Stack.Screen
+                  name={routes.TICKETS_LIST}
+                  component={TicketsListScreen}
+                />
               </>
             )}
 
@@ -189,7 +195,6 @@ export const AppNavigator: React.FC = () => {
                   component={EntregarItensScreen}
                 />
 
-                {/* ✅ NOVA ROTA: Scan de Ticket Avulso */}
                 <Stack.Screen
                   name={routes.SCAN_TICKET_AVULSO}
                   component={ScanTicketAvulsoScreen}

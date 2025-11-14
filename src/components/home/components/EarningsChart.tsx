@@ -1,8 +1,11 @@
-// src/screens/home/components/EarningsChart.tsx
-import React, { useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import { colors } from "../../../constants/colors";
+import { useAuth } from "../../../hooks/useAuth";
+import { useTicketsPendentes } from "../../../hooks/useTicketsPendentes";
+import { api } from "../../../lib/axios";
+import { showErrorToast } from "../../../lib/toast";
 
 interface ChartData {
   id: string;
@@ -13,7 +16,10 @@ interface ChartData {
 }
 
 export const EarningsChart: React.FC = () => {
-  const [data] = useState<ChartData[]>([
+  const { user } = useAuth();
+  const { ticketsPendentes } = useTicketsPendentes();
+  const [isLoading, setIsLoading] = useState(true);
+  const [data, setData] = useState<ChartData[]>([
     {
       id: "approved_tickets",
       category: "Últimas 24h",
@@ -29,6 +35,44 @@ export const EarningsChart: React.FC = () => {
       radius: 30,
     },
   ]);
+
+  const fetchApprovedTickets = useCallback(async () => {
+    if (!user?.id_restaurante) {
+      showErrorToast("Usuário não possui um ID de restaurante associado");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await api.get(
+        `/restaurantes/${user.id_restaurante}/tickets/aprovados-ultimas-24h`
+      );
+      const totalAmount = response.data.tickets?.length || 0;
+
+      setData((prevData) =>
+        prevData.map((item) =>
+          item.id === "approved_tickets"
+            ? { ...item, amount: totalAmount }
+            : item.id === "pending_tickets"
+              ? { ...item, amount: ticketsPendentes.length }
+              : item
+        )
+      );
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Erro desconhecido ao buscar tickets";
+      showErrorToast(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user, ticketsPendentes.length]);
+
+  useEffect(() => {
+    fetchApprovedTickets();
+  }, [fetchApprovedTickets]);
 
   const total = data.reduce((sum, item) => sum + item.amount, 0);
 
@@ -52,40 +96,46 @@ export const EarningsChart: React.FC = () => {
 
       <View style={styles.chartContent}>
         <View style={styles.svgContainer}>
-          <Svg
-            height="80"
-            width="80"
-            viewBox="0 0 100 100"
-            style={{ transform: [{ rotate: "-90deg" }] }}
-          >
-            <Circle
-              cx="50"
-              cy="50"
-              r="42"
-              stroke="#E5E7EB"
-              strokeWidth="8"
-              fill="none"
-            />
-            {data.map((item) => {
-              const { strokeDasharray } = calculateStrokeDashArray(
-                item.amount,
-                item.radius
-              );
-              return (
-                <Circle
-                  key={item.id}
-                  cx="50"
-                  cy="50"
-                  r={item.radius}
-                  stroke={item.color}
-                  strokeWidth="8"
-                  strokeLinecap="round"
-                  strokeDasharray={strokeDasharray}
-                  fill="none"
-                />
-              );
-            })}
-          </Svg>
+          {isLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#FB923C" />
+            </View>
+          ) : (
+            <Svg
+              height="80"
+              width="80"
+              viewBox="0 0 100 100"
+              style={{ transform: [{ rotate: "-90deg" }] }}
+            >
+              <Circle
+                cx="50"
+                cy="50"
+                r="42"
+                stroke="#E5E7EB"
+                strokeWidth="8"
+                fill="none"
+              />
+              {data.map((item) => {
+                const { strokeDasharray } = calculateStrokeDashArray(
+                  item.amount,
+                  item.radius
+                );
+                return (
+                  <Circle
+                    key={item.id}
+                    cx="50"
+                    cy="50"
+                    r={item.radius}
+                    stroke={item.color}
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={strokeDasharray}
+                    fill="none"
+                  />
+                );
+              })}
+            </Svg>
+          )}
         </View>
 
         <View style={styles.legend}>
@@ -143,6 +193,12 @@ const styles = StyleSheet.create({
   svgContainer: {
     width: 80,
     height: 80,
+  },
+  loadingContainer: {
+    width: 80,
+    height: 80,
+    justifyContent: "center",
+    alignItems: "center",
   },
   legend: {
     flex: 1,

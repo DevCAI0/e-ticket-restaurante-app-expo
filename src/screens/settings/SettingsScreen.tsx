@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+// src/screens/Establishment/SettingsScreen.tsx
+
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,17 +8,23 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import * as Notifications from "expo-notifications";
 import { colors } from "../../constants/colors";
 import { useAuth } from "../../hooks/useAuth";
 import { Header } from "../../components/common/Header";
 import { BottomNav } from "../../components/common/BottomNav";
 import { usePedidosPendentes } from "../../hooks/usePedidosPendentes";
 import { RootStackParamList } from "../../navigation/AppNavigator";
+import {
+  usePushNotifications,
+  useTestNotification,
+} from "../../hooks/usePushNotifications";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -27,6 +35,7 @@ interface SettingItemProps {
   onPress?: () => void;
   rightElement?: React.ReactNode;
   danger?: boolean;
+  disabled?: boolean;
 }
 
 const SettingItem: React.FC<SettingItemProps> = ({
@@ -36,12 +45,13 @@ const SettingItem: React.FC<SettingItemProps> = ({
   onPress,
   rightElement,
   danger = false,
+  disabled = false,
 }) => {
   return (
     <TouchableOpacity
-      style={styles.settingItem}
+      style={[styles.settingItem, disabled && styles.settingItemDisabled]}
       onPress={onPress}
-      disabled={!onPress && !rightElement}
+      disabled={disabled || (!onPress && !rightElement)}
       activeOpacity={onPress ? 0.7 : 1}
     >
       <View style={styles.settingLeft}>
@@ -76,7 +86,53 @@ export const SettingsScreen: React.FC = () => {
     hasNewOrders,
     markAsViewed,
   } = usePedidosPendentes();
+
+  const { expoPushToken, registerForPushNotifications } =
+    usePushNotifications();
+
+  const { sendTestNotification, isSending } = useTestNotification();
+
   const [activeTab, setActiveTab] = useState("ajustes");
+  const [notificationStatus, setNotificationStatus] =
+    useState<string>("Verificando...");
+  const [isRegistering, setIsRegistering] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      verificarStatusNotificacoes();
+      if (!expoPushToken) {
+        tryAutoRegister();
+      }
+    }
+  }, [user, expoPushToken]);
+
+  const tryAutoRegister = async () => {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status === "granted") {
+        await registerForPushNotifications();
+      }
+    } catch (error) {
+      console.log("Erro ao tentar registro automático:", error);
+    }
+  };
+
+  const verificarStatusNotificacoes = async () => {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+
+      if (status === "granted") {
+        setNotificationStatus(expoPushToken ? "Ativas" : "Ativando...");
+      } else if (status === "denied") {
+        setNotificationStatus("Negadas");
+      } else {
+        setNotificationStatus("Não solicitadas");
+      }
+    } catch (error) {
+      console.error("Erro ao verificar status:", error);
+      setNotificationStatus("Erro");
+    }
+  };
 
   const handleLogout = async () => {
     Alert.alert("Sair da conta", "Tem certeza que deseja sair?", [
@@ -100,11 +156,89 @@ export const SettingsScreen: React.FC = () => {
     );
   };
 
+  const handleNotificationPermissions = async () => {
+    if (isRegistering) return;
+
+    try {
+      setIsRegistering(true);
+      const { status: existingStatus } =
+        await Notifications.getPermissionsAsync();
+
+      if (existingStatus === "granted") {
+        if (expoPushToken) {
+          Alert.alert(
+            "Notificações Ativas",
+            "As notificações já estão ativadas!",
+            [{ text: "OK" }]
+          );
+        } else {
+          await registerForPushNotifications();
+          await verificarStatusNotificacoes();
+          Alert.alert(
+            "Token Registrado",
+            "Token de notificação registrado com sucesso!",
+            [{ text: "OK" }]
+          );
+        }
+        return;
+      }
+
+      if (existingStatus === "denied") {
+        Alert.alert(
+          "Permissão Negada",
+          "Você negou as permissões de notificação anteriormente. Para ativar, vá em:\n\nConfigurações > Apps > E-Ticket > Notificações",
+          [{ text: "OK" }]
+        );
+        return;
+      }
+
+      const { status } = await Notifications.requestPermissionsAsync();
+
+      if (status === "granted") {
+        await registerForPushNotifications();
+        await verificarStatusNotificacoes();
+        Alert.alert(
+          "Permissão Concedida!",
+          "Notificações ativadas com sucesso!",
+          [{ text: "OK" }]
+        );
+      } else {
+        Alert.alert("Permissão Negada", "Você não receberá notificações push.");
+      }
+
+      await verificarStatusNotificacoes();
+    } catch (error) {
+      console.error("Erro ao solicitar permissões:", error);
+      Alert.alert("Erro", "Falha ao solicitar permissões de notificação.");
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    if (!expoPushToken) {
+      Alert.alert(
+        "Token não registrado",
+        "Primeiro ative as notificações para testar.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    const success = await sendTestNotification();
+
+    if (success) {
+      Alert.alert(
+        "Notificação Enviada!",
+        "Você deve receber uma notificação de teste em alguns segundos.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
   const handleTabChange = (tab: string) => {
-    console.log("⚙️ [SETTINGS] Mudando para tab:", tab);
     setActiveTab(tab);
 
-    // Navegar para a tela correspondente
     if (tab === "home") {
       navigation.navigate("Home");
     } else if (tab === "pedidos") {
@@ -112,6 +246,23 @@ export const SettingsScreen: React.FC = () => {
       navigation.navigate("Pedidos");
     }
   };
+
+  const getStatusColor = () => {
+    switch (notificationStatus) {
+      case "Ativas":
+        return colors.success;
+      case "Negadas":
+        return colors.destructive.light;
+      case "Ativando...":
+        return "#f59e0b";
+      default:
+        return colors.muted.light;
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -123,18 +274,69 @@ export const SettingsScreen: React.FC = () => {
             <Ionicons name="person" size={32} color={colors.primary} />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user?.nome || "Usuário"}</Text>
+            <Text style={styles.profileName}>{user.nome || "Usuário"}</Text>
             <Text style={styles.profileDetail}>
-              CPF: {user?.login || "---"}
+              Login: {user.login || "---"}
             </Text>
-            <Text style={styles.profileDetail}>
-              Matrícula: {user?.login || "---"}
-            </Text>
+            {user.id_estabelecimento && (
+              <Text style={styles.profileDetail}>Estabelecimento</Text>
+            )}
+            {user.id_restaurante && (
+              <Text style={styles.profileDetail}>Restaurante</Text>
+            )}
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sistema</Text>
+          <Text style={styles.sectionTitle}>Notificações Push</Text>
+
+          <SettingItem
+            icon="notifications-outline"
+            title="Status das Notificações"
+            subtitle={notificationStatus}
+            onPress={handleNotificationPermissions}
+            disabled={isRegistering}
+            rightElement={
+              isRegistering ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <View style={styles.statusContainer}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      { backgroundColor: getStatusColor() },
+                    ]}
+                  />
+                </View>
+              )
+            }
+          />
+
+          <SettingItem
+            icon="send-outline"
+            title="Testar Notificação"
+            subtitle="Enviar notificação de teste"
+            onPress={handleTestNotification}
+            disabled={!expoPushToken || isSending}
+            rightElement={
+              isSending ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : null
+            }
+          />
+
+          {__DEV__ && expoPushToken && (
+            <View style={styles.tokenInfo}>
+              <Text style={styles.tokenLabel}>Token (DEV):</Text>
+              <Text style={styles.tokenText} numberOfLines={1}>
+                {expoPushToken.substring(0, 40)}...
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Permissões</Text>
 
           <SettingItem
             icon="camera-outline"
@@ -145,6 +347,8 @@ export const SettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Conta</Text>
+
           <SettingItem
             icon="log-out-outline"
             title="Sair da conta"
@@ -154,8 +358,9 @@ export const SettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Versão 1.0.0</Text>
-          <Text style={styles.footerText}>© 2024 eTicket</Text>
+          <Text style={styles.footerText}>E-Ticket Restaurante</Text>
+          <Text style={styles.footerText}>Versão 1.0.2</Text>
+          <Text style={styles.footerText}>© 2024</Text>
         </View>
       </ScrollView>
 
@@ -188,7 +393,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.primaryLight + "20",
+    backgroundColor: "#E5E7EB",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -230,6 +435,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
   },
+  settingItemDisabled: {
+    opacity: 0.5,
+  },
   settingLeft: {
     flexDirection: "row",
     alignItems: "center",
@@ -262,6 +470,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.muted.light,
     marginTop: 2,
+  },
+  statusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  tokenInfo: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#f3f4f6",
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  tokenLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.muted.light,
+    marginBottom: 4,
+    textTransform: "uppercase",
+  },
+  tokenText: {
+    fontSize: 12,
+    fontFamily: "monospace",
+    color: colors.text.light,
   },
   footer: {
     alignItems: "center",
