@@ -2,7 +2,8 @@
   "expo": {
     "name": "e-ticket-restaurante-app",
     "slug": "e-ticket-restaurante-app",
-    "version": "1.0.0",
+    "version": "1.0.3",
+    "owner": "caio287",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -30,6 +31,12 @@
         }
       ],
       [
+        "@react-native-firebase/app"
+      ],
+      [
+        "@react-native-firebase/messaging"
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
@@ -46,7 +53,10 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "UIBackgroundModes": ["fetch", "remote-notification"]
+        "UIBackgroundModes": [
+          "fetch",
+          "remote-notification"
+        ]
       },
       "bundleIdentifier": "com.caio12323.eticketrestauranteapp"
     },
@@ -57,19 +67,17 @@
       },
       "permissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK",
-        "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.caio12323.eticketrestauranteapp",
       "usesCleartextTraffic": true,
-      "useNextNotificationsApi": true
+      "useNextNotificationsApi": true,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -77,7 +85,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "1ff9ff6d-ca7d-46f9-b842-a6079304a191"
+        "projectId": "ec3c8e6c-6bac-4e1e-a258-23f94bb04e00"
       }
     }
   }

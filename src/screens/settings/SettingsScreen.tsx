@@ -1,4 +1,4 @@
-// src/screens/Establishment/SettingsScreen.tsx
+// src/screens/SettingsScreen.tsx
 
 import React, { useState, useEffect } from "react";
 import {
@@ -96,6 +96,7 @@ export const SettingsScreen: React.FC = () => {
   const [notificationStatus, setNotificationStatus] =
     useState<string>("Verificando...");
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isDevToken, setIsDevToken] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -105,6 +106,15 @@ export const SettingsScreen: React.FC = () => {
       }
     }
   }, [user, expoPushToken]);
+
+  useEffect(() => {
+    if (expoPushToken) {
+      const isDev =
+        expoPushToken.includes("[dev-") ||
+        expoPushToken.includes("[development-");
+      setIsDevToken(isDev);
+    }
+  }, [expoPushToken]);
 
   const tryAutoRegister = async () => {
     try {
@@ -225,6 +235,15 @@ export const SettingsScreen: React.FC = () => {
       return;
     }
 
+    if (isDevToken) {
+      Alert.alert(
+        "Token de Desenvolvimento",
+        "Você está usando um token de desenvolvimento.\n\nNotificações remotas só funcionam com builds de produção.\n\nUse: eas build --profile preview --platform android",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
     const success = await sendTestNotification();
 
     if (success) {
@@ -331,6 +350,14 @@ export const SettingsScreen: React.FC = () => {
               <Text style={styles.tokenText} numberOfLines={1}>
                 {expoPushToken.substring(0, 40)}...
               </Text>
+              {isDevToken && (
+                <View style={styles.devWarning}>
+                  <Ionicons name="warning" size={16} color="#f59e0b" />
+                  <Text style={styles.devWarningText}>
+                    Token de desenvolvimento - Use testador local ou EAS build
+                  </Text>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -359,7 +386,7 @@ export const SettingsScreen: React.FC = () => {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>E-Ticket Restaurante</Text>
-          <Text style={styles.footerText}>Versão 1.0.2</Text>
+          <Text style={styles.footerText}>Versão 1.0.3</Text>
           <Text style={styles.footerText}>© 2024</Text>
         </View>
       </ScrollView>
@@ -499,6 +526,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "monospace",
     color: colors.text.light,
+  },
+  devWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: "#fef3c7",
+    borderRadius: 4,
+    gap: 6,
+  },
+  devWarningText: {
+    flex: 1,
+    fontSize: 11,
+    color: "#92400e",
   },
   footer: {
     alignItems: "center",

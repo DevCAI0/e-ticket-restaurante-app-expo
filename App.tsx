@@ -5,12 +5,12 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "./src/contexts/AuthContext";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { ToastContainer } from "./src/components/common/ToastContainer";
-import { useHorarioNotificacoes } from "./src/hooks/useHorarioNotificacoes";
+
+// ❌ REMOVIDO: useHorarioNotificacoes
+// Não é necessário porque as notificações vêm do Laravel via Expo Push API
+// Elas funcionam mesmo com o app fechado!
 
 function AppContent() {
-  // Este hook irá verificar horários e enviar notificações locais
-  useHorarioNotificacoes();
-
   return (
     <>
       <AppNavigator />

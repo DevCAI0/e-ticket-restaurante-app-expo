@@ -30,7 +30,7 @@ export type RootStackParamList = {
   Home: undefined;
   Scanner: undefined;
   ManualVerification: undefined;
-  TicketsList: undefined; // ✅ NOVO
+  TicketsList: undefined;
   BiometricApproval: {
     mode?: "pedido" | "avulso";
     pedidoId?: number;
@@ -102,7 +102,6 @@ export const AppNavigator: React.FC = () => {
           <>
             <Stack.Screen name={routes.HOME} component={HomeScreen} />
 
-            {/* Tela de Ajustes - disponível para todos */}
             <Stack.Screen name="Ajustes" component={SettingsScreen} />
 
             <Stack.Screen
@@ -128,7 +127,6 @@ export const AppNavigator: React.FC = () => {
                   name={routes.MANUAL_VERIFICATION}
                   component={ManualVerificationScreen}
                 />
-                {/* ✅ NOVA TELA: Lista de Tickets */}
                 <Stack.Screen
                   name={routes.TICKETS_LIST}
                   component={TicketsListScreen}
