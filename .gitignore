@@ -44,3 +44,8 @@ google-services.json
 # generated native folders
 /ios
 /android
+
+# Firebase credentials
+firebase-service-account.json
+google-services.json
+.env
