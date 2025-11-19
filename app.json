@@ -30,12 +30,8 @@
           "mode": "production"
         }
       ],
-      [
-        "@react-native-firebase/app"
-      ],
-      [
-        "@react-native-firebase/messaging"
-      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       [
         "expo-build-properties",
         {
@@ -53,10 +49,7 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
         },
-        "UIBackgroundModes": [
-          "fetch",
-          "remote-notification"
-        ]
+        "UIBackgroundModes": ["fetch", "remote-notification"]
       },
       "bundleIdentifier": "com.caio12323.eticketrestauranteapp"
     },
