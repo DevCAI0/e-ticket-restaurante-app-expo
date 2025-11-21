@@ -45,3 +45,6 @@ firebase-service-account.json
 # Firebase credentials
 firebase-service-account.json
 .env
+e-ticket-restaurante-firebase-adminsdk-fbsvc-d64a26c89a.json
+firebase-service-account.json
+*-firebase-adminsdk-*.json

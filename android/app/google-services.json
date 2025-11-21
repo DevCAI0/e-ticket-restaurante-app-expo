@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "773979403060",
+    "project_id": "e-ticket-restaurante",
+    "storage_bucket": "e-ticket-restaurante.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:773979403060:android:0215d15e93420854b26b61",
+        "android_client_info": {
+          "package_name": "com.caio12323.eticketrestauranteapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbrLbMxgs7uYS1RMnY9-CDXboRfQ3k8vg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
